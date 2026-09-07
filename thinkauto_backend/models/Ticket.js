@@ -1,10 +1,10 @@
 import mongoose from 'mongoose';
+import { TICKET_STATUSES, normalizeTicketStatus } from '../utils/ticketStatus.js';
 
 const ticketSchema = new mongoose.Schema({
   ticketNumber: {
     type: String,
-    unique: true,
-    required: true
+    unique: true
   },
   title: {
     type: String,
@@ -20,7 +20,7 @@ const ticketSchema = new mongoose.Schema({
   category: {
     type: String,
     required: [true, 'Please select a category'],
-    enum: ['Network', 'Hardware', 'Software', 'Access & Permissions', 'Email', 'Other']
+    enum: ['Network', 'Hardware', 'Software', 'Access', 'Security', 'Gmail', 'Others']
   },
   priority: {
     type: String,
@@ -30,7 +30,8 @@ const ticketSchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    enum: ['Open', 'In Progress', 'Resolved', 'Closed', 'On Hold'],
+    enum: TICKET_STATUSES,
+    set: normalizeTicketStatus,
     default: 'Open'
   },
   createdBy: {
@@ -95,6 +96,20 @@ const ticketSchema = new mongoose.Schema({
     feedback: String,
     ratedAt: Date
   },
+  verification: {
+    otp: String,
+    otpExpiry: Date,
+    isVerified: {
+      type: Boolean,
+      default: false
+    },
+    verifiedAt: Date,
+    requestedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User'
+    },
+    requestedAt: Date
+  },
   createdAt: {
     type: Date,
     default: Date.now
@@ -120,16 +135,8 @@ ticketSchema.pre('save', async function(next) {
 ticketSchema.pre('save', function(next) {
   if (this.isNew) {
     const now = new Date();
-    const priorityHours = {
-      'Critical': 2,
-      'High': 8,
-      'Medium': 24,
-      'Low': 48
-    };
-    
-    const hours = priorityHours[this.priority] || 24;
-    this.sla.responseDeadline = new Date(now.getTime() + (hours * 60 * 60 * 1000));
-    this.sla.resolutionDeadline = new Date(now.getTime() + (hours * 2 * 60 * 60 * 1000));
+    this.sla.responseDeadline = new Date(now.getTime() + (24 * 60 * 60 * 1000));
+    this.sla.resolutionDeadline = new Date(now.getTime() + (24 * 60 * 60 * 1000));
   }
   next();
 });

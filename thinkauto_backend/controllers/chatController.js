@@ -1,12 +1,18 @@
 import fetch from 'node-fetch';
+import ChatLog from '../models/ChatLog.js';
 
 const GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions";
 
 export const sendMessage = async (req, res) => {
   try {
+    console.log('=== CHAT REQUEST RECEIVED ===');
+    console.log('User:', req.user?.email);
+    console.log('Body:', req.body);
+    
     const { userMessage, conversationHistory = [] } = req.body;
 
     if (!userMessage) {
+      console.log('ERROR: Message is required');
       return res.status(400).json({ error: "Message is required" });
     }
 
@@ -24,7 +30,7 @@ export const sendMessage = async (req, res) => {
         "Authorization": `Bearer ${GROQ_API_KEY}`,
       },
       body: JSON.stringify({
-        model: "mixtral-8x7b-32768",
+        model: "llama-3.3-70b-versatile",
         messages: [
           {
             role: "system",
@@ -45,6 +51,13 @@ export const sendMessage = async (req, res) => {
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
       console.error("Groq API error:", response.status, errorData);
+      await ChatLog.create({
+        user: req.user._id,
+        userMessage,
+        aiResponse: "Failed to get AI response",
+        status: 'failed',
+        error: errorData.error?.message || "Failed to get AI response"
+      });
       return res.status(response.status).json({ 
         error: errorData.error?.message || "Failed to get AI response" 
       });
@@ -53,6 +66,14 @@ export const sendMessage = async (req, res) => {
     const data = await response.json();
     const aiResponse = data.choices[0]?.message?.content || "I apologize, but I couldn't generate a response. Please try again.";
 
+    await ChatLog.create({
+      user: req.user._id,
+      userMessage,
+      aiResponse,
+      usage: data.usage,
+      status: 'success'
+    });
+
     res.json({ 
       response: aiResponse,
       usage: data.usage 
@@ -60,6 +81,59 @@ export const sendMessage = async (req, res) => {
 
   } catch (error) {
     console.error("Chat controller error:", error);
+    try {
+      if (req.user?._id && req.body?.userMessage) {
+        await ChatLog.create({
+          user: req.user._id,
+          userMessage: req.body.userMessage,
+          aiResponse: "Internal server error",
+          status: 'failed',
+          error: error.message
+        });
+      }
+    } catch (logError) {
+      console.error("Failed to save chat error log:", logError.message);
+    }
     res.status(500).json({ error: "Internal server error" });
+  }
+};
+
+export const getChatLogs = async (req, res) => {
+  try {
+    const { status, search } = req.query;
+    const query = {};
+
+    if (req.user.role !== 'admin') {
+      query.user = req.user._id;
+    }
+
+    if (status && status !== 'all') {
+      query.status = status;
+    }
+
+    if (search) {
+      query.$or = [
+        { userMessage: { $regex: search, $options: 'i' } },
+        { aiResponse: { $regex: search, $options: 'i' } }
+      ];
+    }
+
+    const logs = await ChatLog.find(query)
+      .populate('user', 'name username email role department')
+      .sort({ createdAt: -1 })
+      .limit(500);
+
+    res.status(200).json({
+      success: true,
+      count: logs.length,
+      data: { logs }
+    });
+  } catch (error) {
+    console.error("Get chat logs error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Error fetching consultation logs",
+      error: error.message
+    });
   }
 };

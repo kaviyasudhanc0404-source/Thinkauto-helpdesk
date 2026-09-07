@@ -137,7 +137,7 @@ thinkauto_backend/
 ### Ticket Model
 - ticketNumber (auto-generated)
 - title, description, category, priority
-- status: Open, In Progress, Resolved, Closed
+- status: Open, In Progress, Resolved, Unsolved, On Hold
 - createdBy (User ref), assignedTo (User ref)
 - comments, attachments, SLA tracking
 - AI suggestions, resolution details

@@ -6,7 +6,9 @@ import {
   updateTicket,
   addComment,
   assignTicket,
-  getTicketStats
+  getTicketStats,
+  requestVerification,
+  verifyTicketCompletion
 } from '../controllers/ticketController.js';
 import { protect, authorize } from '../middleware/auth.js';
 
@@ -24,5 +26,7 @@ router.route('/:id')
 
 router.post('/:id/comments', protect, addComment);
 router.put('/:id/assign', protect, authorize('admin'), assignTicket);
+router.post('/:id/request-verification', protect, authorize('technician', 'admin'), requestVerification);
+router.post('/:id/verify-completion', protect, verifyTicketCompletion);
 
 export default router;

@@ -146,10 +146,35 @@ class ApiService {
     return this.request('/tickets/stats');
   }
 
+  async requestVerification(ticketId: string) {
+    return this.request(`/tickets/${ticketId}/request-verification`, {
+      method: 'POST',
+    });
+  }
+
+  async verifyTicketCompletion(ticketId: string, otp: string) {
+    return this.request(`/tickets/${ticketId}/verify-completion`, {
+      method: 'POST',
+      body: JSON.stringify({ otp }),
+    });
+  }
+
+  async getChatLogs(params = {}) {
+    const queryString = new URLSearchParams(params).toString();
+    return this.request(`/chat/logs${queryString ? `?${queryString}` : ''}`);
+  }
+
   // Users
   async getUsers(params = {}) {
     const queryString = new URLSearchParams(params).toString();
     return this.request(`/users${queryString ? `?${queryString}` : ''}`);
+  }
+
+  async createUser(userData) {
+    return this.request('/users', {
+      method: 'POST',
+      body: JSON.stringify(userData),
+    });
   }
 
   async getUser(id) {
@@ -175,6 +200,31 @@ class ApiService {
 
   async getUserStats() {
     return this.request('/users/stats');
+  }
+
+  // Generic HTTP methods
+  async get(endpoint: string, options = {}) {
+    return this.request(endpoint, { ...options, method: 'GET' });
+  }
+
+  async post(endpoint: string, data: any, options = {}) {
+    return this.request(endpoint, {
+      ...options,
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async put(endpoint: string, data: any, options = {}) {
+    return this.request(endpoint, {
+      ...options,
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async delete(endpoint: string, options = {}) {
+    return this.request(endpoint, { ...options, method: 'DELETE' });
   }
 }
 

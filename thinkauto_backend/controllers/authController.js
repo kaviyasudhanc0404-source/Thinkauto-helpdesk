@@ -199,6 +199,7 @@ export const getMe = async (req, res) => {
           phoneNumber: user.phoneNumber,
           avatar: user.avatar,
           isActive: user.isActive,
+          isAvailable: user.isAvailable,
           lastLogin: user.lastLogin
         }
       }
@@ -382,6 +383,44 @@ export const deleteAccount = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Error deleting account',
+      error: error.message
+    });
+  }
+};
+
+// @desc    Update technician availability status
+// @route   PUT /api/auth/availability
+// @access  Private (Technicians only)
+export const updateAvailability = async (req, res) => {
+  try {
+    const { isAvailable } = req.body;
+
+    // Only technicians can update availability
+    if (req.user.role !== 'technician') {
+      return res.status(403).json({
+        success: false,
+        message: 'Only technicians can update availability status'
+      });
+    }
+
+    const user = await User.findByIdAndUpdate(
+      req.user._id,
+      { isAvailable },
+      { new: true }
+    );
+
+    res.status(200).json({
+      success: true,
+      message: `Availability updated to ${isAvailable ? 'available' : 'unavailable'}`,
+      data: {
+        isAvailable: user.isAvailable
+      }
+    });
+  } catch (error) {
+    console.error('Update availability error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error updating availability',
       error: error.message
     });
   }

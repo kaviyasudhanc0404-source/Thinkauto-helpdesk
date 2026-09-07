@@ -190,7 +190,7 @@ const Signup = () => {
   ];
 
   return (
-    <div className="min-h-screen gradient-dark flex items-center justify-center p-4 relative overflow-hidden">
+    <div className="relative flex min-h-screen items-center justify-center overflow-x-hidden px-4 py-20 gradient-dark sm:py-24">
       {/* Animated Background effects */}
       <motion.div 
         className="absolute top-1/3 -right-32 w-96 h-96 rounded-full bg-primary/5 blur-3xl"
@@ -238,7 +238,7 @@ const Signup = () => {
         initial={{ opacity: 0, y: 30 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.6 }}
-        className="w-full max-w-lg relative z-10"
+        className="relative z-10 w-full max-w-lg"
       >
         <motion.div 
           className="text-center mb-8"
@@ -299,7 +299,7 @@ const Signup = () => {
               </p>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="flex flex-col gap-5">
               <div>
                 <label className="text-sm font-semibold text-foreground mb-2 block">Username</label>
                 <input

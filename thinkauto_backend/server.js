@@ -7,6 +7,7 @@ import authRoutes from './routes/authRoutes.js';
 import ticketRoutes from './routes/ticketRoutes.js';
 import userRoutes from './routes/userRoutes.js';
 import chatRoutes from './routes/chatRoutes.js';
+import emailTicketService from './services/emailTicketService.js';
 
 // Load environment variables
 dotenv.config();
@@ -77,17 +78,71 @@ app.use((err, req, res, next) => {
 
 // Start server
 const PORT = process.env.PORT || 5000;
-const server = app.listen(PORT, () => {
+const server = app.listen(PORT, async () => {
   console.log(`\n🚀 Server is running on port ${PORT}`);
   console.log(`🌐 Frontend URL: ${process.env.FRONTEND_URL || 'http://localhost:8080'}`);
   console.log(`📍 API URL: http://localhost:${PORT}/api`);
   console.log(`🏥 Health Check: http://localhost:${PORT}/api/health\n`);
+  
+  // Start email-based ticket creation service
+  try {
+    await emailTicketService.start();
+  } catch (error) {
+    console.error('⚠️  Email service failed to start:', error.message);
+    console.log('   Server will continue without email monitoring');
+  }
 });
 
 // Handle unhandled promise rejections
 process.on('unhandledRejection', (err) => {
-  console.error(`❌ Error: ${err.message}`);
+  console.error(`❌ Unhandled Rejection: ${err.message}`);
+
+  // Don't shut down server for IMAP-related errors
+  if (err.message && (err.message.includes('IMAP') || err.message.includes('EPIPE') || err.message.includes('ECONNRESET'))) {
+    console.warn('⚠️  Email service error - server continues running');
+    return;
+  }
+
+  // For critical errors, shut down gracefully
+  console.error('🔴 Critical error - shutting down server');
+  emailTicketService.stop();
   server.close(() => process.exit(1));
+});
+
+// Handle uncaught exceptions (like unhandled error events)
+process.on('uncaughtException', (err) => {
+  console.error(`❌ Uncaught Exception: ${err.message}`);
+
+  // Don't shut down server for IMAP/Socket-related errors
+  if (err.message && (err.message.includes('IMAP') || err.message.includes('socket') || err.message.includes('EPIPE') || err.message.includes('ECONNRESET'))) {
+    console.warn('⚠️  Email service error - server continues running');
+    console.log('   Email monitoring may be disabled, but API continues to work');
+    return;
+  }
+
+  // For critical errors, shut down gracefully
+  console.error('🔴 Critical error - shutting down server');
+  emailTicketService.stop();
+  server.close(() => process.exit(1));
+});
+
+// Handle graceful shutdown
+process.on('SIGTERM', () => {
+  console.log('👋 SIGTERM received, shutting down gracefully');
+  emailTicketService.stop();
+  server.close(() => {
+    console.log('✅ Server closed');
+    process.exit(0);
+  });
+});
+
+process.on('SIGINT', () => {
+  console.log('\n👋 SIGINT received, shutting down gracefully');
+  emailTicketService.stop();
+  server.close(() => {
+    console.log('✅ Server closed');
+    process.exit(0);
+  });
 });
 
 export default app;

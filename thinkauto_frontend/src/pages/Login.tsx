@@ -80,7 +80,7 @@ const Login = () => {
   ];
 
   return (
-    <div className="min-h-screen gradient-dark flex items-center justify-center p-4 relative overflow-hidden">
+    <div className="relative flex min-h-screen items-center justify-center overflow-x-hidden px-4 py-20 gradient-dark sm:py-24">
       {/* Animated Background effects */}
       <motion.div 
         className="absolute top-1/4 -left-32 w-96 h-96 rounded-full bg-primary/5 blur-3xl"
@@ -128,7 +128,7 @@ const Login = () => {
         initial={{ opacity: 0, y: 30 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.6 }}
-        className="w-full max-w-md relative z-10"
+        className="relative z-10 w-full max-w-md"
       >
         <motion.div 
           className="text-center mb-8"

@@ -21,8 +21,8 @@ const TicketDetails = () => {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-4">
-          <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} className="glass rounded-2xl p-6">
-            <div className="flex items-center gap-2 mb-3">
+          <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} className="glass rounded-2xl p-4 sm:p-6">
+            <div className="mb-3 flex flex-wrap items-center gap-2">
               <span className="px-2.5 py-1 rounded-lg text-xs font-medium bg-primary/15 text-primary">High Priority</span>
               <span className="px-2.5 py-1 rounded-lg text-xs font-medium bg-[hsl(var(--warning))]/15 text-[hsl(var(--warning))]">In Progress</span>
             </div>
@@ -30,13 +30,13 @@ const TicketDetails = () => {
             <p className="text-sm text-muted-foreground">Unable to connect to corporate VPN since morning. Getting timeout error after 30 seconds. Tried restarting laptop and router. Issue persists on both Wi-Fi and ethernet.</p>
           </motion.div>
 
-          <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="glass rounded-2xl p-6">
+          <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="glass rounded-2xl p-4 sm:p-6">
             <h3 className="font-display font-semibold text-foreground mb-4 flex items-center gap-2">
               <MessageSquare className="w-4 h-4 text-primary" /> Comments
             </h3>
             <div className="space-y-4">
               <div className="bg-secondary/50 rounded-xl p-4">
-                <div className="flex items-center gap-2 mb-2">
+                <div className="mb-2 flex flex-wrap items-center gap-2">
                   <div className="w-6 h-6 rounded-full gradient-primary flex items-center justify-center text-[10px] font-bold text-primary-foreground">AC</div>
                   <span className="text-sm font-medium text-foreground">Alex Chen</span>
                   <span className="text-xs text-muted-foreground">30m ago</span>
@@ -46,7 +46,7 @@ const TicketDetails = () => {
             </div>
             <div className="mt-4">
               <textarea placeholder="Add a comment..." rows={3} className="w-full bg-secondary rounded-xl px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground outline-none focus:ring-2 focus:ring-primary/50 resize-none" />
-              <button className="mt-2 gradient-primary text-primary-foreground text-sm font-medium px-4 py-2 rounded-xl">Send</button>
+              <button className="mt-2 w-full rounded-xl px-4 py-2.5 text-sm font-medium text-primary-foreground gradient-primary sm:w-auto">Send</button>
             </div>
           </motion.div>
         </div>

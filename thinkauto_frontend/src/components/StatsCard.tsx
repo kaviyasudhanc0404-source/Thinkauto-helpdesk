@@ -41,20 +41,20 @@ const StatsCard = ({ icon: Icon, label, value, trend, variant = "default" }: Sta
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       whileHover={{ y: -2, transition: { duration: 0.2 } }}
-      className={`${variantStyles[variant]} rounded-2xl p-5 transition-all`}
+      className={`${variantStyles[variant]} min-w-0 rounded-2xl p-3 transition-all sm:p-5`}
     >
-      <div className="flex items-start justify-between mb-3">
-        <div className={`${iconBg[variant]} rounded-xl p-2.5`}>
-          <Icon className={`w-5 h-5 ${iconColor[variant]}`} />
+      <div className="mb-3 flex items-start justify-between gap-2">
+        <div className={`${iconBg[variant]} rounded-xl p-2 sm:p-2.5`}>
+          <Icon className={`h-4 w-4 sm:h-5 sm:w-5 ${iconColor[variant]}`} />
         </div>
         {trend && (
-          <span className="text-xs font-medium text-[hsl(var(--success))] bg-[hsl(var(--success)/.1)] px-2 py-1 rounded-full">
+          <span className="max-w-full truncate rounded-full bg-[hsl(var(--success)/.1)] px-2 py-1 text-[10px] font-medium text-[hsl(var(--success))] sm:text-xs">
             {trend}
           </span>
         )}
       </div>
-      <p className="text-2xl font-display font-bold text-foreground">{value}</p>
-      <p className="text-sm text-muted-foreground mt-1">{label}</p>
+      <p className="break-words font-display text-xl font-bold text-foreground sm:text-2xl">{value}</p>
+      <p className="mt-1 break-words text-xs text-muted-foreground sm:text-sm">{label}</p>
     </motion.div>
   );
 };

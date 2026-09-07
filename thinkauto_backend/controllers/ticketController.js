@@ -1,30 +1,121 @@
 import Ticket from '../models/Ticket.js';
 import User from '../models/User.js';
+import fetch from 'node-fetch';
+import { sendTicketCreatedEmail, sendTicketAssignedEmail, sendOTPEmail } from '../services/emailService.js';
+import { applyTicketDeadline, enforceTicketDeadlines } from '../services/ticketLifecycleService.js';
+import { normalizeTicketStatus } from '../utils/ticketStatus.js';
 
-// @desc    Create new ticket
+const ML_SERVICE_URL = process.env.ML_SERVICE_URL || 'http://localhost:5001';
+
+// @desc    Create new ticket with AI analysis
 // @route   POST /api/tickets
 // @access  Private (Employee, Technician, Admin)
 export const createTicket = async (req, res) => {
   try {
-    const { title, description, category, priority } = req.body;
+    const { description } = req.body;
 
+    if (!description || !description.trim()) {
+      return res.status(400).json({
+        success: false,
+        message: 'Issue description is required'
+      });
+    }
+
+    // Step 1: Analyze ticket using ML service
+    let category = 'Others';
+    let priority = 'Medium';
+    let assignedTeam = 'General Support Team';
+    
+    try {
+      const mlResponse = await fetch(`${ML_SERVICE_URL}/analyze`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ issue: description })
+      });
+      
+      if (mlResponse.ok) {
+        const mlData = await mlResponse.json();
+        if (mlData.success) {
+          category = mlData.data.category;
+          priority = mlData.data.priority;
+          assignedTeam = mlData.data.assignedTeam;
+          console.log('✓ ML Analysis:', { category, priority, assignedTeam });
+        }
+      }
+    } catch (mlError) {
+      console.warn('⚠ ML service unavailable, using defaults:', mlError.message);
+    }
+
+    // Step 2: Auto-assign to available technician in the category domain
+    let assignedTechnician = null;
+    try {
+      const technicians = await User.find({
+        role: 'technician',
+        isActive: true,
+        isAvailable: true,
+        department: category
+      }).sort({ lastLogin: -1 });
+
+      if (technicians.length > 0) {
+        // Assign to the most recently active technician
+        assignedTechnician = technicians[0]._id;
+        console.log(`✓ Auto-assigned to technician: ${technicians[0].name}`);
+      } else {
+        console.log('⚠ No available technicians found for', category);
+      }
+    } catch (assignError) {
+      console.warn('⚠ Auto-assignment failed:', assignError.message);
+    }
+
+    // Step 3: Generate title from description (first 50 chars)
+    const title = description.length > 50 
+      ? description.substring(0, 50) + '...' 
+      : description;
+
+    // Step 4: Create ticket
     const ticket = await Ticket.create({
       title,
       description,
       category,
-      priority: priority || 'Medium',
-      createdBy: req.user._id
+      priority,
+      createdBy: req.user._id,
+      assignedTo: assignedTechnician
     });
 
     await ticket.populate([
-      { path: 'createdBy', select: 'name email role' },
-      { path: 'assignedTo', select: 'name email role' }
+      { path: 'createdBy', select: 'name email role department phoneNumber' },
+      { path: 'assignedTo', select: 'name email role department phoneNumber' }
     ]);
+
+    // Step 5: Send email notifications
+    try {
+      // Email to employee
+      await sendTicketCreatedEmail(ticket.createdBy.email, ticket);
+      
+      // Email to assigned technician
+      if (ticket.assignedTo) {
+        await sendTicketAssignedEmail(
+          ticket.assignedTo.email,
+          ticket.assignedTo.name,
+          ticket
+        );
+      }
+    } catch (emailError) {
+      console.warn('⚠ Email notification failed:', emailError.message);
+    }
 
     res.status(201).json({
       success: true,
       message: 'Ticket created successfully',
-      data: { ticket }
+      data: { 
+        ticket,
+        mlAnalysis: {
+          category,
+          priority,
+          assignedTeam,
+          autoAssigned: !!assignedTechnician
+        }
+      }
     });
   } catch (error) {
     console.error('Create ticket error:', error);
@@ -41,6 +132,7 @@ export const createTicket = async (req, res) => {
 // @access  Private
 export const getTickets = async (req, res) => {
   try {
+    await enforceTicketDeadlines();
     let query = {};
 
     // Filter based on user role
@@ -56,7 +148,7 @@ export const getTickets = async (req, res) => {
 
     // Query parameters
     const { status, priority, category } = req.query;
-    if (status) query.status = status;
+    if (status) query.status = normalizeTicketStatus(status);
     if (priority) query.priority = priority;
     if (category) query.category = category;
 
@@ -85,6 +177,7 @@ export const getTickets = async (req, res) => {
 // @access  Private
 export const getTicket = async (req, res) => {
   try {
+    await enforceTicketDeadlines({ _id: req.params.id });
     const ticket = await Ticket.findById(req.params.id)
       .populate('createdBy', 'name email role department phoneNumber')
       .populate('assignedTo', 'name email role department phoneNumber')
@@ -145,13 +238,30 @@ export const updateTicket = async (req, res) => {
     }
 
     const { status, priority, assignedTo } = req.body;
+    const nextStatus = normalizeTicketStatus(status);
 
-    if (status) ticket.status = status;
+    await applyTicketDeadline(ticket);
+
+    if (ticket.status === 'Unsolved' && nextStatus !== 'Unsolved') {
+      return res.status(400).json({
+        success: false,
+        message: 'This ticket crossed the 24-hour completion window and cannot be reopened'
+      });
+    }
+
+    if (nextStatus === 'Resolved' && !ticket.verification?.isVerified) {
+      return res.status(400).json({
+        success: false,
+        message: 'Ticket completion must be verified with the employee OTP before it can be resolved'
+      });
+    }
+
+    if (nextStatus) ticket.status = nextStatus;
     if (priority) ticket.priority = priority;
     if (assignedTo !== undefined) ticket.assignedTo = assignedTo;
 
     // If status is Resolved, set resolution
-    if (status === 'Resolved' && !ticket.resolution.resolvedAt) {
+    if (nextStatus === 'Resolved' && !ticket.resolution.resolvedAt) {
       ticket.resolution.resolvedBy = req.user._id;
       ticket.resolution.resolvedAt = new Date();
     }
@@ -233,6 +343,15 @@ export const assignTicket = async (req, res) => {
       });
     }
 
+    await applyTicketDeadline(ticket);
+
+    if (ticket.status === 'Unsolved') {
+      return res.status(400).json({
+        success: false,
+        message: 'This ticket crossed the 24-hour completion window and cannot be assigned'
+      });
+    }
+
     // Verify technician exists
     if (technicianId) {
       const technician = await User.findById(technicianId);
@@ -275,11 +394,12 @@ export const assignTicket = async (req, res) => {
 // @access  Private (Admin)
 export const getTicketStats = async (req, res) => {
   try {
+    await enforceTicketDeadlines();
     const totalTickets = await Ticket.countDocuments();
     const openTickets = await Ticket.countDocuments({ status: 'Open' });
     const inProgressTickets = await Ticket.countDocuments({ status: 'In Progress' });
     const resolvedTickets = await Ticket.countDocuments({ status: 'Resolved' });
-    const closedTickets = await Ticket.countDocuments({ status: 'Closed' });
+    const unsolvedTickets = await Ticket.countDocuments({ status: 'Unsolved' });
 
     const priorityStats = await Ticket.aggregate([
       {
@@ -307,7 +427,7 @@ export const getTicketStats = async (req, res) => {
           open: openTickets,
           inProgress: inProgressTickets,
           resolved: resolvedTickets,
-          closed: closedTickets
+          unsolved: unsolvedTickets
         },
         byPriority: priorityStats,
         byCategory: categoryStats
@@ -318,6 +438,190 @@ export const getTicketStats = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Error fetching statistics',
+      error: error.message
+    });
+  }
+};
+
+// @desc    Request ticket completion verification (Technician)
+// @route   POST /api/tickets/:id/request-verification
+// @access  Private (Technician, Admin)
+export const requestVerification = async (req, res) => {
+  try {
+    const ticket = await Ticket.findById(req.params.id)
+      .populate('createdBy', 'name email')
+      .populate('assignedTo', 'name email');
+
+    if (!ticket) {
+      return res.status(404).json({
+        success: false,
+        message: 'Ticket not found'
+      });
+    }
+
+    // Check if technician is assigned to this ticket
+    if (req.user.role === 'technician' && ticket.assignedTo?._id.toString() !== req.user._id.toString()) {
+      return res.status(403).json({
+        success: false,
+        message: 'Not authorized to request verification for this ticket'
+      });
+    }
+
+    await applyTicketDeadline(ticket);
+
+    if (ticket.status === 'Unsolved') {
+      return res.status(400).json({
+        success: false,
+        message: 'This ticket crossed the 24-hour completion window and is marked as unsolved'
+      });
+    }
+
+    if (ticket.status === 'Resolved') {
+      return res.status(400).json({
+        success: false,
+        message: 'This ticket is already resolved'
+      });
+    }
+
+    // Generate 6-digit OTP
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    const otpExpiry = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
+
+    // Update ticket with OTP
+    ticket.verification = {
+      otp,
+      otpExpiry,
+      isVerified: false,
+      requestedBy: req.user._id,
+      requestedAt: new Date()
+    };
+
+    await ticket.save();
+
+    // Send OTP email to employee
+    await sendOTPEmail(
+      ticket.createdBy.email,
+      ticket.createdBy.name,
+      ticket,
+      otp
+    );
+
+    res.status(200).json({
+      success: true,
+      message: 'Verification OTP sent to employee email',
+      data: {
+        otpSent: true,
+        expiresIn: '15 minutes'
+      }
+    });
+  } catch (error) {
+    console.error('Request verification error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error requesting verification',
+      error: error.message
+    });
+  }
+};
+
+// @desc    Verify OTP and complete ticket (Assigned Technician)
+// @route   POST /api/tickets/:id/verify-completion
+// @access  Private (Assigned Technician, Admin)
+export const verifyTicketCompletion = async (req, res) => {
+  try {
+    const { otp } = req.body;
+
+    if (!otp) {
+      return res.status(400).json({
+        success: false,
+        message: 'OTP is required'
+      });
+    }
+
+    const ticket = await Ticket.findById(req.params.id)
+      .populate('createdBy', 'name email')
+      .populate('assignedTo', 'name email');
+
+    if (!ticket) {
+      return res.status(404).json({
+        success: false,
+        message: 'Ticket not found'
+      });
+    }
+
+    await applyTicketDeadline(ticket);
+
+    if (ticket.status === 'Unsolved') {
+      return res.status(400).json({
+        success: false,
+        message: 'This ticket crossed the 24-hour completion window and is marked as unsolved'
+      });
+    }
+
+    const isAdmin = req.user.role === 'admin';
+    const isAssignedTechnician =
+      req.user.role === 'technician' &&
+      ticket.assignedTo?._id?.toString() === req.user._id.toString();
+
+    // Verification is performed by the assigned technician (OTP is shared by employee)
+    if (!isAdmin && !isAssignedTechnician) {
+      return res.status(403).json({
+        success: false,
+        message: 'Only the assigned technician can verify completion'
+      });
+    }
+
+    // Check if OTP exists
+    if (!ticket.verification?.otp) {
+      return res.status(400).json({
+        success: false,
+        message: 'No verification request found for this ticket'
+      });
+    }
+
+    // Check if OTP has expired
+    if (new Date() > new Date(ticket.verification.otpExpiry)) {
+      return res.status(400).json({
+        success: false,
+        message: 'OTP has expired. Please request a new verification code.'
+      });
+    }
+
+    // Verify OTP
+    if (ticket.verification.otp !== otp.trim()) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid OTP. Please check and try again.'
+      });
+    }
+
+    // Mark ticket as completed
+    ticket.status = 'Resolved';
+    ticket.verification.isVerified = true;
+    ticket.verification.verifiedAt = new Date();
+    // Clear OTP after successful verification
+    ticket.verification.otp = undefined;
+    ticket.verification.otpExpiry = undefined;
+    ticket.resolution = {
+      text: isAdmin
+        ? 'Ticket completed and verified by admin using employee OTP'
+        : 'Ticket completed and verified by technician using employee OTP',
+      resolvedBy: ticket.assignedTo?._id || req.user._id,
+      resolvedAt: new Date()
+    };
+
+    await ticket.save();
+
+    res.status(200).json({
+      success: true,
+      message: 'Ticket completed successfully',
+      data: { ticket }
+    });
+  } catch (error) {
+    console.error('Verify completion error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error verifying ticket completion',
       error: error.message
     });
   }

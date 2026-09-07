@@ -1,5 +1,6 @@
 import express from 'express';
 import {
+  createUser,
   getUsers,
   getUser,
   updateUser,
@@ -15,7 +16,8 @@ router.get('/technicians', protect, authorize('admin', 'technician'), getTechnic
 router.get('/stats', protect, authorize('admin'), getUserStats);
 
 router.route('/')
-  .get(protect, authorize('admin'), getUsers);
+  .get(protect, authorize('admin'), getUsers)
+  .post(protect, authorize('admin'), createUser);
 
 router.route('/:id')
   .get(protect, authorize('admin'), getUser)

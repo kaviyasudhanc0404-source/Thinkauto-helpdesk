@@ -1,5 +1,56 @@
 import User from '../models/User.js';
 
+// @desc    Create user
+// @route   POST /api/users
+// @access  Private (Admin)
+export const createUser = async (req, res) => {
+  try {
+    const { name, username, email, password, role, department, phoneNumber, isActive } = req.body;
+
+    if (!username || !email || !password) {
+      return res.status(400).json({
+        success: false,
+        message: 'Username, email, and password are required'
+      });
+    }
+
+    const existingUser = await User.findOne({
+      $or: [{ email: email.toLowerCase() }, { username: username.toLowerCase() }]
+    });
+
+    if (existingUser) {
+      return res.status(400).json({
+        success: false,
+        message: 'A user with that email or username already exists'
+      });
+    }
+
+    const user = await User.create({
+      name,
+      username,
+      email,
+      password,
+      role: role || 'employee',
+      department,
+      phoneNumber,
+      isActive: isActive !== undefined ? isActive : true
+    });
+
+    res.status(201).json({
+      success: true,
+      message: 'User created successfully',
+      data: { user }
+    });
+  } catch (error) {
+    console.error('Create user error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error creating user',
+      error: error.message
+    });
+  }
+};
+
 // @desc    Get all users
 // @route   GET /api/users
 // @access  Private (Admin)

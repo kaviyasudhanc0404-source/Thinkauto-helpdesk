@@ -1,35 +1,91 @@
+import { useEffect, useState } from "react";
 import DashboardLayout from "@/components/DashboardLayout";
 import TicketCard from "@/components/TicketCard";
+import api from "@/lib/api";
 import { motion } from "framer-motion";
-import { Search, Filter } from "lucide-react";
-import { useState } from "react";
-
-const tickets = [
-  { id: "1024", title: "VPN not connecting on office network", description: "Unable to connect to VPN.", status: "in_progress" as const, priority: "high" as const, slaTime: "2h 15m", assignee: "Alex Chen", createdAt: "2h ago" },
-  { id: "1022", title: "Printer not responding on 3rd floor", description: "HP LaserJet showing offline.", status: "urgent" as const, priority: "critical" as const, slaTime: "0h 45m", assignee: "Sarah Kim", createdAt: "4h ago" },
-  { id: "1020", title: "Slow laptop performance", description: "Windows update caused lag.", status: "open" as const, priority: "medium" as const, slaTime: "5h", createdAt: "6h ago" },
-  { id: "1019", title: "New software license request", description: "Need Adobe Creative Suite.", status: "open" as const, priority: "medium" as const, slaTime: "6h", createdAt: "5h ago" },
-  { id: "1018", title: "Employee onboarding IT setup", description: "New hire workstation setup.", status: "open" as const, priority: "low" as const, slaTime: "24h", assignee: "Mike Johnson", createdAt: "1d ago" },
-  { id: "1015", title: "Email signature update", description: "Update signature with new title.", status: "resolved" as const, priority: "low" as const, assignee: "Lisa Park", createdAt: "1d ago" },
-];
+import { Loader2, RefreshCw, Search } from "lucide-react";
+import { formatRelativeTime, getSlaInfo, priorityToCardPriority } from "@/lib/adminMetrics";
+import { toTicketCardStatus } from "@/lib/ticketStatus";
+import { useToast } from "@/hooks/use-toast";
 
 const AllTickets = () => {
   const [search, setSearch] = useState("");
-  const filtered = tickets.filter((t) => t.title.toLowerCase().includes(search.toLowerCase()));
+  const [tickets, setTickets] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const { toast } = useToast();
+
+  const fetchTickets = async () => {
+    try {
+      setError("");
+      const response = await api.getTickets();
+      if (response.success) {
+        setTickets(response.data.tickets || []);
+      }
+    } catch (fetchError) {
+      setTickets([]);
+      setError(fetchError.message || "Unable to load real tickets from the backend.");
+      toast({ title: "Tickets unavailable", description: fetchError.message, variant: "destructive" });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchTickets();
+    const timer = window.setInterval(fetchTickets, 10000);
+    return () => window.clearInterval(timer);
+  }, []);
+
+  const filtered = tickets.filter((ticket) => {
+    const value = `${ticket.title} ${ticket.description} ${ticket.ticketNumber} ${ticket.createdBy?.name || ""}`.toLowerCase();
+    return value.includes(search.toLowerCase());
+  });
 
   return (
     <DashboardLayout title="All Tickets">
-      <div className="relative mb-6">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-        <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search all tickets..." className="w-full bg-secondary rounded-xl pl-10 pr-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground outline-none focus:ring-2 focus:ring-primary/50" />
+      <div className="flex flex-col sm:flex-row gap-3 mb-6">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search all tickets..." className="w-full bg-secondary rounded-xl pl-10 pr-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground outline-none focus:ring-2 focus:ring-primary/50" />
+        </div>
+        <button onClick={fetchTickets} className="glass flex w-full items-center justify-center gap-2 rounded-xl px-3 py-2.5 text-sm text-foreground hover:border-primary/30 sm:w-auto">
+          <RefreshCw className="w-4 h-4" /> Refresh
+        </button>
       </div>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {filtered.map((ticket, i) => (
-          <motion.div key={ticket.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.04 }}>
-            <TicketCard {...ticket} />
-          </motion.div>
-        ))}
-      </div>
+      {loading ? (
+        <div className="glass rounded-2xl p-10 flex justify-center">
+          <Loader2 className="w-6 h-6 animate-spin text-primary" />
+        </div>
+      ) : error ? (
+        <div className="glass rounded-2xl p-8 text-center">
+          <p className="font-display font-semibold text-foreground">No backend tickets loaded</p>
+          <p className="text-sm text-muted-foreground mt-2">{error}</p>
+        </div>
+      ) : filtered.length === 0 ? (
+        <div className="glass rounded-2xl p-8 text-center">
+          <p className="font-display font-semibold text-foreground">No real tickets found</p>
+          <p className="text-sm text-muted-foreground mt-2">Tickets will appear here only after they are created in the helpdesk backend.</p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {filtered.map((ticket, i) => (
+            <motion.div key={ticket._id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.03 }} className="h-full">
+              <TicketCard
+                id={ticket.ticketNumber || ticket._id.slice(-6)}
+                title={ticket.title}
+                description={ticket.description}
+                status={toTicketCardStatus(ticket)}
+                priority={priorityToCardPriority(ticket.priority)}
+                slaTime={getSlaInfo(ticket).label}
+                assignee={ticket.assignedTo?.name}
+                createdAt={formatRelativeTime(ticket.createdAt)}
+                className="h-64"
+              />
+            </motion.div>
+          ))}
+        </div>
+      )}
     </DashboardLayout>
   );
 };

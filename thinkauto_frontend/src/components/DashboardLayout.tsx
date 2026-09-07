@@ -9,27 +9,33 @@ const DashboardLayout = ({ children, title }: { children: ReactNode; title: stri
   const { role } = useAuth();
 
   return (
-    <div className="min-h-screen gradient-dark">
-      {/* Header */}
-      <header className="sticky top-0 z-40 glass-strong border-b border-border">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between">
-          <BrandLogo size="sm" />
-          <div className="flex items-center gap-3">
-            <span className="text-xs font-medium text-muted-foreground capitalize px-3 py-1.5 rounded-full bg-secondary">
-              {role}
-            </span>
-            <ProfileDropdown />
+    <div className="min-h-screen gradient-dark overflow-x-hidden">
+      <div className="min-h-screen">
+        {/* Header */}
+        <header className="sticky top-0 z-40 glass-strong border-b border-border">
+          <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-4 py-3 sm:px-6">
+            <BrandLogo size="sm" />
+            <div className="flex shrink-0 items-center gap-2 sm:gap-3">
+              <span className="hidden text-xs font-medium capitalize text-muted-foreground rounded-full bg-secondary px-3 py-1.5 min-[360px]:inline">
+                {role}
+              </span>
+              <ProfileDropdown />
+            </div>
           </div>
+        </header>
+
+        {/* Page title */}
+        <div className="mx-auto max-w-7xl px-4 pb-2 pt-6 sm:px-6">
+          <h1 className="break-words font-display text-2xl font-bold leading-tight text-foreground sm:text-3xl">
+            {title}
+          </h1>
         </div>
-      </header>
 
-      {/* Page title */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 pt-6 pb-2">
-        <h1 className="text-2xl sm:text-3xl font-display font-bold text-foreground">{title}</h1>
+        {/* Content */}
+        <main className="mx-auto w-full max-w-7xl px-4 pb-24 pt-2 sm:px-6">
+          {children}
+        </main>
       </div>
-
-      {/* Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 pb-24 pt-2">{children}</main>
 
       <Navigation />
       <ChatBot />

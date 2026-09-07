@@ -15,10 +15,12 @@ import {
   KeyRound,
   Trash2,
   IdCard,
+  Power,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import api from "@/lib/api";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Switch } from "@/components/ui/switch";
 import {
   Select,
   SelectContent,
@@ -51,6 +53,7 @@ const Profile = () => {
   const [email, setEmail] = useState("");
   const [phoneNumber, setPhoneNumber] = useState("");
   const [department, setDepartment] = useState("");
+  const [isAvailable, setIsAvailable] = useState(true);
 
   // Password change fields
   const [currentPassword, setCurrentPassword] = useState("");
@@ -67,6 +70,7 @@ const Profile = () => {
       setEmail(user.email || "");
       setPhoneNumber(user.phoneNumber || "");
       setDepartment(user.department || "");
+      setIsAvailable((user as any).isAvailable !== false);
     }
   }, [user]);
 
@@ -126,6 +130,30 @@ const Profile = () => {
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleAvailabilityToggle = async (checked: boolean) => {
+    setIsAvailable(checked);
+    try {
+      const response = await api.put('/auth/availability', { isAvailable: checked });
+      if (response.success) {
+        setUser({ ...user, isAvailable: checked } as any);
+        toast({
+          title: checked ? "You're now available" : "You're now unavailable",
+          description: checked 
+            ? "You can receive new ticket assignments" 
+            : "You won't receive new ticket assignments",
+        });
+      }
+    } catch (error: any) {
+      // Revert on error
+      setIsAvailable(!checked);
+      toast({
+        title: "Failed to update availability",
+        description: error.message || "Something went wrong",
+        variant: "destructive",
+      });
     }
   };
 
@@ -279,13 +307,13 @@ const Profile = () => {
             </div>
 
             {/* Edit Button */}
-            <div className="flex gap-2">
+            <div className="flex w-full flex-wrap justify-center gap-2 sm:w-auto sm:justify-start">
               {!isEditing ? (
                 <motion.button
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
                   onClick={() => setIsEditing(true)}
-                  className="flex items-center gap-2 px-4 py-2 rounded-xl bg-primary text-primary-foreground font-medium text-sm hover:opacity-90 transition-all"
+                  className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground transition-all hover:opacity-90 sm:w-auto"
                 >
                   <Edit2 className="w-4 h-4" />
                   Edit Profile
@@ -297,7 +325,7 @@ const Profile = () => {
                     whileTap={{ scale: 0.95 }}
                     onClick={handleSaveProfile}
                     disabled={loading}
-                    className="flex items-center gap-2 px-4 py-2 rounded-xl bg-green-500 text-white font-medium text-sm hover:bg-green-600 transition-all disabled:opacity-50"
+                    className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-green-500 px-4 py-2.5 text-sm font-medium text-white transition-all hover:bg-green-600 disabled:opacity-50 sm:flex-none"
                   >
                     <Save className="w-4 h-4" />
                     {loading ? "Saving..." : "Save"}
@@ -315,7 +343,7 @@ const Profile = () => {
                         setDepartment(user.department || "");
                       }
                     }}
-                    className="flex items-center gap-2 px-4 py-2 rounded-xl bg-secondary text-foreground font-medium text-sm hover:bg-secondary/80 transition-all"
+                    className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-secondary px-4 py-2.5 text-sm font-medium text-foreground transition-all hover:bg-secondary/80 sm:flex-none"
                   >
                     <X className="w-4 h-4" />
                     Cancel
@@ -346,7 +374,7 @@ const Profile = () => {
                   <IdCard className="w-4 h-4" />
                   User ID
                 </label>
-                <div className="bg-secondary/50 border border-border/30 rounded-lg px-4 py-3 text-sm text-foreground font-mono">
+                <div className="break-all rounded-lg border border-border/30 bg-secondary/50 px-4 py-3 font-mono text-sm text-foreground">
                   {user?._id || "N/A"}
                 </div>
               </div>
@@ -418,7 +446,7 @@ const Profile = () => {
                 <Mail className="w-4 h-4" />
                 Email Address
               </label>
-              <div className="bg-secondary/50 border border-border/30 rounded-lg px-4 py-3 text-sm text-foreground">
+              <div className="break-all rounded-lg border border-border/30 bg-secondary/50 px-4 py-3 text-sm text-foreground">
                 {email || "Not set"}
               </div>
             </div>
@@ -535,6 +563,39 @@ const Profile = () => {
           </div>
         </motion.div>
 
+        {/* Availability Toggle - Only for Technicians */}
+        {role === 'technician' && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.15 }}
+            className="glass-strong rounded-2xl p-6 sm:p-8 border border-border/50"
+          >
+            <h3 className="text-lg font-bold text-foreground mb-6 flex items-center gap-2">
+              <Power className="w-5 h-5 text-primary" />
+              Work Availability
+            </h3>
+
+            <div className="flex items-start justify-between gap-4 rounded-xl border border-border/30 bg-secondary/50 p-4">
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-medium text-foreground mb-1">
+                  Available for Work
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {isAvailable 
+                    ? "You are currently available to receive new ticket assignments" 
+                    : "You are currently unavailable for new ticket assignments"}
+                </p>
+              </div>
+              <Switch
+                checked={isAvailable}
+                onCheckedChange={handleAvailabilityToggle}
+                className="data-[state=checked]:bg-green-500"
+              />
+            </div>
+          </motion.div>
+        )}
+
         {/* Security Actions */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -619,7 +680,7 @@ const Profile = () => {
                 required
               />
             </div>
-            <div className="flex gap-3 pt-2">
+            <div className="flex flex-col gap-3 pt-2 sm:flex-row">
               <button
                 type="button"
                 onClick={() => {

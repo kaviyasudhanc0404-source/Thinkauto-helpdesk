@@ -2,15 +2,13 @@ import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { MessageCircle, X, Send, Bot, Sparkles, Loader2, Trash2, Minimize2, Maximize2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import api from "@/lib/api";
 
 interface Message {
   role: "bot" | "user";
   text: string;
   timestamp: Date;
 }
-
-const GROQ_API_KEY = import.meta.env.VITE_GROQ_API_KEY || "";
-const GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions";
 
 const ChatBot = () => {
   const [isOpen, setIsOpen] = useState(false);
@@ -45,7 +43,7 @@ const ChatBot = () => {
         }))
       });
 
-      return response.data.response || "I apologize, but I couldn't generate a response. Please try again.";
+      return response.response || "I apologize, but I couldn't generate a response. Please try again.";
     } catch (error: any) {
       console.error("Chat API error:", error);
       return "I'm having trouble connecting right now. Please try again in a moment or create a support ticket for immediate assistance.";
@@ -117,11 +115,11 @@ const ChatBot = () => {
             animate={{ scale: 1 }}
             exit={{ scale: 0 }}
             onClick={() => setIsOpen(true)}
-            className="fixed bottom-6 right-6 z-50 gradient-primary rounded-full p-5 glow-orange shadow-2xl hover:shadow-primary/50 transition-shadow"
+            className="fixed bottom-4 right-4 z-50 rounded-full p-4 gradient-primary shadow-2xl glow-orange transition-shadow hover:shadow-primary/50 sm:bottom-6 sm:right-6 sm:p-5"
             whileHover={{ scale: 1.1 }}
             whileTap={{ scale: 0.95 }}
           >
-            <Bot className="w-7 h-7 text-primary-foreground" />
+            <MessageCircle className="w-7 h-7 text-primary-foreground" />
             <motion.span 
               className="absolute -top-1 -right-1 w-4 h-4 bg-green-500 rounded-full border-2 border-background"
               animate={{ scale: [1, 1.2, 1] }}
@@ -139,33 +137,35 @@ const ChatBot = () => {
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 20, scale: 0.95 }}
             transition={{ type: "spring", damping: 25, stiffness: 300 }}
-            className={`fixed z-50 glass-strong rounded-2xl shadow-2xl overflow-hidden border border-border/50 ${
+            className={`fixed z-50 overflow-hidden rounded-2xl border border-border/50 glass-strong shadow-2xl ${
               isMinimized 
-                ? 'bottom-6 right-6 w-80' 
-                : 'bottom-6 right-6 w-[90vw] sm:w-[450px] lg:w-[500px]'
+                ? 'bottom-4 left-4 right-4 sm:left-auto sm:right-6 sm:w-80' 
+                : 'inset-x-2 bottom-2 max-h-[calc(100dvh-1rem)] sm:inset-x-auto sm:bottom-6 sm:right-6 sm:w-[min(450px,calc(100vw-3rem))] lg:w-[min(500px,calc(100vw-3rem))]'
             }`}
+            role="dialog"
+            aria-label="ThinkAuto AI assistant"
           >
             {/* Header */}
-            <div className="gradient-primary p-4 flex items-center justify-between backdrop-blur-xl">
-              <div className="flex items-center gap-3">
+            <div className="flex items-center justify-between gap-2 p-3 gradient-primary backdrop-blur-xl sm:p-4">
+              <div className="flex min-w-0 items-center gap-2 sm:gap-3">
                 <div className="relative">
                   <div className="gradient-primary rounded-full p-2">
-                    <Bot className="w-5 h-5 text-primary-foreground" />
+                    <MessageCircle className="w-5 h-5 text-primary-foreground" />
                   </div>
                   <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-green-500 rounded-full border-2 border-background"></span>
                 </div>
-                <div>
+                <div className="min-w-0">
                   <div className="flex items-center gap-2">
-                    <span className="font-display font-bold text-primary-foreground text-lg">ThinkAuto AI</span>
+                    <span className="truncate font-display text-base font-bold text-primary-foreground sm:text-lg">ThinkAuto AI</span>
                     <Sparkles className="w-4 h-4 text-yellow-300 animate-pulse" />
                   </div>
                   <p className="text-xs text-primary-foreground/80">Online • Always here to help</p>
                 </div>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex shrink-0 items-center gap-0.5 sm:gap-1">
                 <button 
                   onClick={() => setIsMinimized(!isMinimized)}
-                  className="hover:bg-white/10 rounded-lg p-1.5 transition-colors"
+                  className="touch-target inline-flex items-center justify-center rounded-lg transition-colors hover:bg-white/10"
                   title={isMinimized ? "Expand" : "Minimize"}
                 >
                   {isMinimized ? (
@@ -176,14 +176,15 @@ const ChatBot = () => {
                 </button>
                 <button 
                   onClick={clearChat}
-                  className="hover:bg-white/10 rounded-lg p-1.5 transition-colors"
+                  className="touch-target inline-flex items-center justify-center rounded-lg transition-colors hover:bg-white/10"
                   title="Clear chat"
                 >
                   <Trash2 className="w-4 h-4 text-primary-foreground/80 hover:text-primary-foreground" />
                 </button>
                 <button 
                   onClick={() => setIsOpen(false)}
-                  className="hover:bg-white/10 rounded-lg p-1.5 transition-colors"
+                  className="touch-target inline-flex items-center justify-center rounded-lg transition-colors hover:bg-white/10"
+                  aria-label="Close chat"
                 >
                   <X className="w-4 h-4 text-primary-foreground/80 hover:text-primary-foreground" />
                 </button>
@@ -193,8 +194,8 @@ const ChatBot = () => {
             {!isMinimized && (
               <>
                 {/* Messages */}
-                <div className={`overflow-y-auto p-4 space-y-4 bg-gradient-to-b from-secondary/30 to-background ${
-                  messages.length > 6 ? 'h-[400px] sm:h-[450px]' : 'h-[350px]'
+                <div className={`overflow-y-auto p-3 sm:p-4 space-y-4 bg-gradient-to-b from-secondary/30 to-background ${
+                  messages.length > 6 ? 'h-[min(52dvh,400px)] sm:h-[450px]' : 'h-[min(46dvh,350px)]'
                 }`}>
                   {messages.map((msg, i) => (
                     <motion.div
@@ -207,11 +208,11 @@ const ChatBot = () => {
                       {msg.role === "bot" && (
                         <div className="flex-shrink-0">
                           <div className="gradient-primary rounded-full p-2">
-                            <Bot className="w-4 h-4 text-primary-foreground" />
+                            <MessageCircle className="w-4 h-4 text-primary-foreground" />
                           </div>
                         </div>
                       )}
-                      <div className={`flex flex-col ${msg.role === "user" ? "items-end" : "items-start"} max-w-[85%]`}>
+                      <div className={`flex min-w-0 max-w-[82%] flex-col sm:max-w-[85%] ${msg.role === "user" ? "items-end" : "items-start"}`}>
                         <div
                           className={`rounded-2xl px-4 py-3 text-sm leading-relaxed ${
                             msg.role === "user"
@@ -244,7 +245,7 @@ const ChatBot = () => {
                       className="flex justify-start gap-2"
                     >
                       <div className="gradient-primary rounded-full p-2">
-                        <Bot className="w-4 h-4 text-primary-foreground" />
+                        <MessageCircle className="w-4 h-4 text-primary-foreground" />
                       </div>
                       <div className="glass border border-border/50 rounded-2xl px-4 py-3">
                         <div className="flex gap-1.5">
@@ -271,7 +272,7 @@ const ChatBot = () => {
                 </div>
 
                 {/* Input */}
-                <div className="p-4 border-t border-border/50 bg-background/50 backdrop-blur-xl">
+                <div className="border-t border-border/50 bg-background/50 p-3 backdrop-blur-xl sm:p-4">
                   <div className="flex gap-2">
                     <input
                       value={input}
@@ -279,12 +280,12 @@ const ChatBot = () => {
                       onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && sendMessage()}
                       placeholder="Ask me anything..."
                       disabled={isLoading}
-                      className="flex-1 bg-secondary/80 backdrop-blur-sm border border-border/50 rounded-xl px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground outline-none focus:ring-2 focus:ring-primary/50 transition-all disabled:opacity-50"
+                      className="min-w-0 flex-1 rounded-xl border border-border/50 bg-secondary/80 px-3 py-3 text-sm text-foreground outline-none backdrop-blur-sm transition-all placeholder:text-muted-foreground focus:ring-2 focus:ring-primary/50 disabled:opacity-50 sm:px-4"
                     />
                     <button
                       onClick={sendMessage}
                       disabled={isLoading || !input.trim()}
-                      className="gradient-primary rounded-xl px-4 py-3 text-primary-foreground hover:opacity-90 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg hover:shadow-primary/50"
+                      className="touch-target shrink-0 rounded-xl px-3 text-primary-foreground gradient-primary shadow-lg transition-all hover:opacity-90 hover:shadow-primary/50 disabled:cursor-not-allowed disabled:opacity-50 sm:px-4"
                     >
                       {isLoading ? (
                         <Loader2 className="w-5 h-5 animate-spin" />

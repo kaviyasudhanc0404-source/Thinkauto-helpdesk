@@ -184,7 +184,7 @@ const ProfileDropdown = () => {
           </motion.button>
         </DropdownMenuTrigger>
 
-        <DropdownMenuContent align="end" className="w-72 glass-strong border-border/50 p-2">
+        <DropdownMenuContent align="end" className="w-[calc(100vw-2rem)] max-w-72 glass-strong border-border/50 p-2">
           <DropdownMenuLabel className="p-3">
             <div className="flex items-start gap-3">
               <div className={`w-12 h-12 rounded-full gradient-primary flex items-center justify-center text-base font-bold text-primary-foreground relative overflow-hidden`}>

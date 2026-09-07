@@ -1,32 +1,44 @@
+import { useEffect, useState } from "react";
 import DashboardLayout from "@/components/DashboardLayout";
 import StatsCard from "@/components/StatsCard";
+import api from "@/lib/api";
 import { motion } from "framer-motion";
 import { BarChart3, TrendingUp, Users, Ticket } from "lucide-react";
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, PieChart, Pie, Cell } from "recharts";
-
-const weeklyVolume = [
-  { day: "Mon", count: 12 }, { day: "Tue", count: 19 }, { day: "Wed", count: 15 },
-  { day: "Thu", count: 22 }, { day: "Fri", count: 18 }, { day: "Sat", count: 8 }, { day: "Sun", count: 5 },
-];
-
-const categoryBreakdown = [
-  { name: "Network", value: 35, color: "hsl(25, 95%, 53%)" },
-  { name: "Hardware", value: 25, color: "hsl(38, 92%, 55%)" },
-  { name: "Software", value: 20, color: "hsl(210, 90%, 55%)" },
-  { name: "Access", value: 15, color: "hsl(142, 71%, 45%)" },
-  { name: "Other", value: 5, color: "hsl(25, 12%, 50%)" },
-];
-
-const tooltipStyle = { backgroundColor: "hsl(20, 12%, 11%)", border: "1px solid hsl(25, 12%, 18%)", borderRadius: "12px", color: "hsl(35, 25%, 88%)" };
+import { buildCategoryData, buildDailyVolume, getCurrentWeekTickets, getTicketSummary, tooltipStyle } from "@/lib/adminMetrics";
 
 const Analytics = () => {
+  const [tickets, setTickets] = useState([]);
+  const [users, setUsers] = useState([]);
+
+  const fetchData = async () => {
+    const [ticketResponse, userResponse] = await Promise.all([api.getTickets(), api.getUsers()]);
+    if (ticketResponse.success) setTickets(ticketResponse.data.tickets);
+    if (userResponse.success) setUsers(userResponse.data.users);
+  };
+
+  useEffect(() => {
+    fetchData();
+    const timer = window.setInterval(fetchData, 10000);
+    return () => window.clearInterval(timer);
+  }, []);
+
+  const weeklyTickets = getCurrentWeekTickets(tickets);
+  const summary = getTicketSummary(weeklyTickets);
+  const weeklyVolume = buildDailyVolume(tickets);
+  const categoryBreakdown = buildCategoryData(tickets);
+  const resolutionRate = summary.total ? Math.round((summary.resolved / summary.total) * 100) : 0;
+  const avgResponseHours = weeklyTickets.length
+    ? Math.max(0.1, weeklyTickets.reduce((sum, ticket) => sum + (Date.now() - new Date(ticket.createdAt).getTime()) / 3600000, 0) / weeklyTickets.length).toFixed(1)
+    : "0";
+
   return (
     <DashboardLayout title="Analytics">
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8">
-        <StatsCard icon={Ticket} label="This Week" value={99} variant="primary" trend="+7%" />
-        <StatsCard icon={TrendingUp} label="Resolution Rate" value="94%" variant="success" />
-        <StatsCard icon={BarChart3} label="Avg Time" value="2.6h" variant="info" />
-        <StatsCard icon={Users} label="Active Agents" value={12} variant="warning" />
+        <StatsCard icon={Ticket} label="This Week" value={summary.total} variant="primary" />
+        <StatsCard icon={TrendingUp} label="Resolution Rate" value={`${resolutionRate}%`} variant="success" />
+        <StatsCard icon={BarChart3} label="Avg Age" value={`${avgResponseHours}h`} variant="info" />
+        <StatsCard icon={Users} label="Active Agents" value={users.filter((user) => user.role === "technician" && user.isActive).length} variant="warning" />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -34,10 +46,10 @@ const Analytics = () => {
           <h3 className="font-display font-semibold text-foreground mb-4">Weekly Volume</h3>
           <ResponsiveContainer width="100%" height={250}>
             <BarChart data={weeklyVolume}>
-              <XAxis dataKey="day" axisLine={false} tickLine={false} tick={{ fill: "hsl(25, 12%, 50%)", fontSize: 12 }} />
-              <YAxis axisLine={false} tickLine={false} tick={{ fill: "hsl(25, 12%, 50%)", fontSize: 12 }} />
+              <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: "hsl(25, 12%, 50%)", fontSize: 12 }} />
+              <YAxis allowDecimals={false} axisLine={false} tickLine={false} tick={{ fill: "hsl(25, 12%, 50%)", fontSize: 12 }} />
               <Tooltip contentStyle={tooltipStyle} />
-              <Bar dataKey="count" fill="hsl(25, 95%, 53%)" radius={[6, 6, 0, 0]} />
+              <Bar dataKey="tickets" fill="hsl(25, 95%, 53%)" radius={[6, 6, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </motion.div>
@@ -47,7 +59,7 @@ const Analytics = () => {
           <ResponsiveContainer width="100%" height={200}>
             <PieChart>
               <Pie data={categoryBreakdown} cx="50%" cy="50%" innerRadius={50} outerRadius={80} paddingAngle={3} dataKey="value">
-                {categoryBreakdown.map((entry, index) => <Cell key={index} fill={entry.color} />)}
+                {categoryBreakdown.map((entry) => <Cell key={entry.name} fill={entry.color} />)}
               </Pie>
               <Tooltip contentStyle={tooltipStyle} />
             </PieChart>

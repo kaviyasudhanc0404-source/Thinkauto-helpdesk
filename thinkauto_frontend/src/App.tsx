@@ -13,7 +13,6 @@ import TechnicianDashboard from "./pages/TechnicianDashboard";
 import AdminDashboard from "./pages/AdminDashboard";
 import CreateTicket from "./pages/CreateTicket";
 import MyTickets from "./pages/MyTickets";
-import KnowledgeBase from "./pages/KnowledgeBase";
 import TicketDetails from "./pages/TicketDetails";
 import Profile from "./pages/Profile";
 import AssignedTickets from "./pages/AssignedTickets";
@@ -21,11 +20,11 @@ import Performance from "./pages/Performance";
 import UpdateStatus from "./pages/UpdateStatus";
 import AllTickets from "./pages/AllTickets";
 import AssignTicket from "./pages/AssignTicket";
-import Users from "./pages/Users";
+import Employees from "./pages/Employees";
+import Technicians from "./pages/Technicians";
 import Reports from "./pages/Reports";
 import SLAMonitor from "./pages/SLAMonitor";
 import Analytics from "./pages/Analytics";
-import Team from "./pages/Team";
 import Settings from "./pages/Settings";
 import ConsultationLogs from "./pages/ConsultationLogs";
 import NotFound from "./pages/NotFound";
@@ -51,7 +50,6 @@ const App = () => (
             <Route path="/employee/raise-ticket" element={<ProtectedRoute requiredRole="employee"><CreateTicket /></ProtectedRoute>} />
             <Route path="/employee/my-tickets" element={<ProtectedRoute requiredRole="employee"><MyTickets /></ProtectedRoute>} />
             <Route path="/employee/ticket-details" element={<ProtectedRoute requiredRole="employee"><TicketDetails /></ProtectedRoute>} />
-            <Route path="/employee/knowledge-base" element={<ProtectedRoute requiredRole="employee"><KnowledgeBase /></ProtectedRoute>} />
             <Route path="/employee/consultation-logs" element={<ProtectedRoute requiredRole="employee"><ConsultationLogs /></ProtectedRoute>} />
             <Route path="/employee/profile" element={<ProtectedRoute requiredRole="employee"><Profile /></ProtectedRoute>} />
 
@@ -69,23 +67,24 @@ const App = () => (
             <Route path="/admin/dashboard" element={<ProtectedRoute requiredRole="admin"><AdminDashboard /></ProtectedRoute>} />
             <Route path="/admin/all-tickets" element={<ProtectedRoute requiredRole="admin"><AllTickets /></ProtectedRoute>} />
             <Route path="/admin/assign-ticket" element={<ProtectedRoute requiredRole="admin"><AssignTicket /></ProtectedRoute>} />
-            <Route path="/admin/users" element={<ProtectedRoute requiredRole="admin"><Users /></ProtectedRoute>} />
+            <Route path="/admin/employees" element={<ProtectedRoute requiredRole="admin"><Employees /></ProtectedRoute>} />
+            <Route path="/admin/technicians" element={<ProtectedRoute requiredRole="admin"><Technicians /></ProtectedRoute>} />
             <Route path="/admin/reports" element={<ProtectedRoute requiredRole="admin"><Reports /></ProtectedRoute>} />
             <Route path="/admin/sla-monitor" element={<ProtectedRoute requiredRole="admin"><SLAMonitor /></ProtectedRoute>} />
             <Route path="/admin/settings" element={<ProtectedRoute requiredRole="admin"><Settings /></ProtectedRoute>} />
             <Route path="/admin/analytics" element={<ProtectedRoute requiredRole="admin"><Analytics /></ProtectedRoute>} />
-            <Route path="/admin/team" element={<ProtectedRoute requiredRole="admin"><Team /></ProtectedRoute>} />
+            <Route path="/admin/team" element={<Navigate to="/admin/technicians" replace />} />
+            <Route path="/admin/users" element={<Navigate to="/admin/employees" replace />} />
             <Route path="/admin/consultation-logs" element={<ProtectedRoute requiredRole="admin"><ConsultationLogs /></ProtectedRoute>} />
             <Route path="/admin/profile" element={<ProtectedRoute requiredRole="admin"><Profile /></ProtectedRoute>} />
 
             {/* Legacy redirects */}
             <Route path="/create-ticket" element={<Navigate to="/employee/raise-ticket" replace />} />
             <Route path="/my-tickets" element={<Navigate to="/employee/my-tickets" replace />} />
-            <Route path="/knowledge" element={<Navigate to="/employee/knowledge-base" replace />} />
             <Route path="/assigned" element={<Navigate to="/technician/assigned-tickets" replace />} />
             <Route path="/performance" element={<Navigate to="/technician/update-status" replace />} />
             <Route path="/analytics" element={<Navigate to="/admin/analytics" replace />} />
-            <Route path="/team" element={<Navigate to="/admin/team" replace />} />
+            <Route path="/team" element={<Navigate to="/admin/technicians" replace />} />
             <Route path="/sla" element={<Navigate to="/admin/sla-monitor" replace />} />
             <Route path="/settings" element={<Navigate to="/admin/settings" replace />} />
 
