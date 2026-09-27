@@ -1,0 +1,76 @@
+# Render Blueprint — deploys the two ThinkAuto backends as free web services.
+# Render dashboard → New → Blueprint → select this repo.
+# Keys marked "sync: false" are secrets: Render asks for their values during setup.
+services:
+  # ── Python ML service (ticket category + priority) ─────────────
+  - type: web
+    name: thinkauto-ml
+    runtime: python
+    plan: free
+    region: singapore
+    rootDir: ml_services
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn app:app --bind 0.0.0.0:$PORT --workers 1 --timeout 120
+    healthCheckPath: /health
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.13.0
+
+  # ── Node.js API (auth, tickets, chatbot, email) ────────────────
+  - type: web
+    name: thinkauto-backend
+    runtime: node
+    plan: free
+    region: singapore
+    rootDir: thinkauto_backend
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: MONGODB_URI
+        sync: false
+      - key: JWT_SECRET
+        generateValue: true
+      - key: JWT_EXPIRE
+        value: 7d
+      - key: FRONTEND_URL
+        sync: false
+      - key: ML_SERVICE_URL
+        sync: false
+      - key: GROQ_API_KEY
+        sync: false
+      # Outgoing email — SMTP (may be blocked on Render free tier)
+      - key: EMAIL_HOST
+        value: smtp.gmail.com
+      - key: EMAIL_PORT
+        value: "587"
+      - key: EMAIL_SECURE
+        value: "false"
+      - key: EMAIL_USER
+        sync: false
+      - key: EMAIL_PASS
+        sync: false
+      # Outgoing email — Brevo HTTPS API (used instead of SMTP when set)
+      - key: BREVO_API_KEY
+        sync: false
+      - key: EMAIL_FROM
+        sync: false
+      # Incoming email → tickets
+      - key: IMAP_HOST
+        value: imap.gmail.com
+      - key: IMAP_PORT
+        value: "993"
+      - key: IMAP_TLS
+        value: "true"
+      - key: IMAP_USER
+        sync: false
+      - key: IMAP_PASS
+        sync: false
+      - key: IMAP_CHECK_INTERVAL
+        value: "60000"
+      - key: ADMIN_EMAIL
+        sync: false
+      - key: ADMIN_PASSWORD
+        sync: false

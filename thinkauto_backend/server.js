@@ -1,18 +1,15 @@
-// ThinkAuto Backend v1.1 — chat routes restored
+// Load environment variables first — every module below reads process.env when it is imported
+import 'dotenv/config';
 import express from 'express';
-
 import cors from 'cors';
 import morgan from 'morgan';
-import dotenv from 'dotenv';
 import connectDB from './config/database.js';
 import authRoutes from './routes/authRoutes.js';
 import ticketRoutes from './routes/ticketRoutes.js';
 import userRoutes from './routes/userRoutes.js';
 import chatRoutes from './routes/chatRoutes.js';
 import emailTicketService from './services/emailTicketService.js';
-
-// Load environment variables
-dotenv.config();
+import { frontendUrls } from './utils/frontendUrl.js';
 
 // Connect to database
 connectDB();
@@ -22,7 +19,13 @@ const app = express();
 
 // Middleware
 app.use(cors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:8080',
+  origin: (origin, callback) => {
+    // Allow non-browser requests (health checks, uptime pingers, curl) which send no Origin
+    if (!origin || frontendUrls.includes(origin)) {
+      return callback(null, true);
+    }
+    return callback(null, false);
+  },
   credentials: true
 }));
 app.use(express.json());
@@ -82,9 +85,9 @@ app.use((err, req, res, next) => {
 const PORT = process.env.PORT || 5000;
 const server = app.listen(PORT, async () => {
   console.log(`\n🚀 Server is running on port ${PORT}`);
-  console.log(`🌐 Frontend URL: ${process.env.FRONTEND_URL || 'http://localhost:8080'}`);
-  console.log(`📍 API URL: http://localhost:${PORT}/api`);
-  console.log(`🏥 Health Check: http://localhost:${PORT}/api/health\n`);
+  console.log(`🌐 Allowed frontend origins: ${frontendUrls.join(', ')}`);
+  console.log(`🤖 ML Service URL: ${process.env.ML_SERVICE_URL || 'http://localhost:5001'}`);
+  console.log(`🏥 Health Check: /api/health\n`);
   
   // Start email-based ticket creation service
   try {

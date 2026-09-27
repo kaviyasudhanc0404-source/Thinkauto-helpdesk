@@ -16,7 +16,6 @@ import MyTickets from "./pages/MyTickets";
 import TicketDetails from "./pages/TicketDetails";
 import Profile from "./pages/Profile";
 import AssignedTickets from "./pages/AssignedTickets";
-import Performance from "./pages/Performance";
 import UpdateStatus from "./pages/UpdateStatus";
 import AllTickets from "./pages/AllTickets";
 import AssignTicket from "./pages/AssignTicket";

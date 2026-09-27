@@ -2,7 +2,6 @@ from flask import Flask, request, jsonify
 from flask_cors import CORS
 import pickle
 import os
-import re
 
 app = Flask(__name__)
 CORS(app)
@@ -12,7 +11,8 @@ MODEL_PATH = os.path.join(os.path.dirname(__file__), 'domain_model.pkl')
 model = None
 
 try:
-    model = pickle.load(open(MODEL_PATH, "rb"))
+    with open(MODEL_PATH, "rb") as f:
+        model = pickle.load(f)
     print("✓ ML Model loaded successfully")
 except Exception as e:
     print(f"✗ Error loading model: {e}")
@@ -151,7 +151,8 @@ def analyze_ticket():
         }), 500
 
 if __name__ == '__main__':
-    port = int(os.environ.get('ML_SERVICE_PORT', 5001))
+    # Local development only — in production Render runs: gunicorn app:app
+    port = int(os.environ.get('PORT', os.environ.get('ML_SERVICE_PORT', 5001)))
     print(f"\n🚀 ML Service starting on port {port}...")
     print(f"📊 Model path: {MODEL_PATH}")
-    app.run(host='0.0.0.0', port=port, debug=True)
+    app.run(host='0.0.0.0', port=port, debug=os.environ.get('FLASK_DEBUG') == '1')

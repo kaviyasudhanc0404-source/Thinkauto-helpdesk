@@ -1,5 +1,7 @@
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import BrandLogo from "@/components/BrandLogo";
+import DemoFlow from "@/components/DemoFlow";
 import { motion } from "framer-motion";
 import { ArrowDown, ArrowRight, Zap, Shield, BarChart3, MessageCircle } from "lucide-react";
 
@@ -12,6 +14,7 @@ const features = [
 
 const Index = () => {
   const navigate = useNavigate();
+  const [demoOpen, setDemoOpen] = useState(false);
 
   return (
     <div className="min-h-screen gradient-dark relative overflow-hidden">
@@ -232,7 +235,7 @@ const Index = () => {
               Start Free Trial <ArrowRight className="w-4 sm:w-5 h-4 sm:h-5" />
             </button>
             <button
-              onClick={() => navigate("/login")}
+              onClick={() => setDemoOpen(true)}
               className="w-full sm:w-auto glass text-foreground font-medium px-6 sm:px-8 py-3 sm:py-3.5 rounded-xl hover:bg-secondary/50 transition-all text-sm sm:text-base backdrop-blur-xl border border-border/50"
             >
               Watch Demo
@@ -293,6 +296,15 @@ const Index = () => {
           </div>
         </div>
       </section>
+
+      <DemoFlow
+        open={demoOpen}
+        onOpenChange={setDemoOpen}
+        onGetStarted={() => {
+          setDemoOpen(false);
+          navigate("/signup");
+        }}
+      />
     </div>
   );
 };

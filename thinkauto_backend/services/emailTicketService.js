@@ -1,9 +1,10 @@
 import imaps from 'imap-simple';
 import { simpleParser } from 'mailparser';
-import fetch from 'node-fetch';
 import User from '../models/User.js';
 import Ticket from '../models/Ticket.js';
 import { sendTicketCreatedEmail, sendTicketAssignedEmail } from './emailService.js';
+import { analyzeIssue, findLeastLoadedTechnician } from './ticketRoutingService.js';
+import { primaryFrontendUrl } from '../utils/frontendUrl.js';
 
 class EmailTicketService {
   constructor() {
@@ -332,39 +333,19 @@ class EmailTicketService {
 
       if (!user) {
         console.log(` ⚠️ Skipping: Email sender is not a registered employee`);
-        console.log(` 👉 Please register at the portal first: http://localhost:8081/signup`);
+        console.log(` 👉 Please register at the portal first: ${primaryFrontendUrl}/signup`);
         await connection.addFlags(id, '\\Seen');
         return;
       }
 
       console.log(`   ✅ Verified registered employee: ${user.name}`)
 
-      // Call ML service for categorization
+      // Analyze with ML (falls back to keyword priority if the ML service is unavailable)
       console.log('   🤖 Analyzing issue with ML...');
-      const mlResponse = await fetch(`${process.env.ML_SERVICE_URL}/analyze`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ issue: issueDescription })
-      });
+      const { category, priority } = await analyzeIssue(issueDescription, this.detectPriority(issueDescription));
 
-      if (!mlResponse.ok) {
-        const errorText = await mlResponse.text();
-        throw new Error(`ML service request failed: ${mlResponse.status} - ${errorText}`);
-      }
-
-      const mlData = await mlResponse.json();
-      if (mlData.success === false) {
-        throw new Error(`ML service error: ${mlData.error || 'Unknown error'}`);
-      }
-
-      const mlPayload = mlData.data || mlData;
-      const category = mlPayload.category || 'Others';
-      const priority = mlPayload.priority || this.detectPriority(issueDescription);
-
-      console.log(`   📊 Category: ${category}, Priority: ${priority}`);
-
-      // Find available technician for auto-assignment
-      const assignedTechnician = await this.findAvailableTechnician(category);
+      // Auto-assign to the least-loaded technician in the matching department
+      const assignedTechnician = await findLeastLoadedTechnician(category);
 
       // Generate title from email subject (remove "ThinkAuto" prefix if present)
       let ticketTitle = subject.replace(/thinkauto\s*-?\s*/gi, '').trim();
@@ -465,57 +446,6 @@ class EmailTicketService {
     }
 
     return 'Medium';
-  }
-
-  async findAvailableTechnician(category) {
-    try {
-      // First, try to find technicians with matching domain/department
-      const matchingTechnicians = await User.find({
-        role: 'technician',
-        isActive: true,
-        department: category // Match department with category (Hardware, Network, etc.)
-      });
-
-      let technicians = matchingTechnicians;
-
-      // If no matching technicians found, fall back to any available technician
-      if (technicians.length === 0) {
-        console.log(`   ⚠️  No ${category} specialist found, searching for any available technician...`);
-        technicians = await User.find({
-          role: 'technician',
-          isActive: true
-        });
-      } else {
-        console.log(`   ✅ Found ${technicians.length} ${category} specialist(s)`);
-      }
-
-      if (technicians.length === 0) {
-        console.log('   ⚠️  No technicians available');
-        return null;
-      }
-
-      // Count open tickets for each technician
-      const technicianLoads = await Promise.all(
-        technicians.map(async (tech) => {
-          const openTickets = await Ticket.countDocuments({
-            assignedTo: tech._id,
-            status: { $in: ['Open', 'In Progress'] }
-          });
-          return { technician: tech, load: openTickets };
-        })
-      );
-
-      // Sort by load (ascending) and return least loaded technician
-      technicianLoads.sort((a, b) => a.load - b.load);
-
-      const selectedTech = technicianLoads[0].technician;
-      console.log(`   👨‍🔧 Assigned to: ${selectedTech.name} (${selectedTech.email}) - Current load: ${technicianLoads[0].load} tickets`);
-
-      return selectedTech;
-    } catch (error) {
-      console.error('Error finding technician:', error);
-      return null;
-    }
   }
 }
 

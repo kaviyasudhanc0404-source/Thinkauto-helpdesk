@@ -1,10 +1,14 @@
 import nodemailer from 'nodemailer';
-import dotenv from 'dotenv';
+import fetch from 'node-fetch';
+import { primaryFrontendUrl } from '../utils/frontendUrl.js';
 
-dotenv.config();
+// Two delivery options:
+//  - BREVO_API_KEY set → send through Brevo's HTTPS API (works on hosts that block SMTP ports, e.g. Render free tier)
+//  - otherwise         → send through SMTP with nodemailer (Gmail App Password locally)
+const useBrevo = Boolean(process.env.BREVO_API_KEY);
+const senderEmail = process.env.EMAIL_FROM || process.env.EMAIL_USER;
 
-// Create transporter
-const transporter = nodemailer.createTransport({
+const transporter = useBrevo ? null : nodemailer.createTransport({
   host: process.env.EMAIL_HOST,
   port: parseInt(process.env.EMAIL_PORT),
   secure: process.env.EMAIL_SECURE === 'true',
@@ -14,14 +18,46 @@ const transporter = nodemailer.createTransport({
   }
 });
 
-// Verify transporter configuration
-transporter.verify((error, success) => {
-  if (error) {
-    console.error('❌ Email service configuration error:', error);
-  } else {
-    console.log('✅ Email service is ready');
+// Verify configuration
+if (useBrevo) {
+  console.log(`✅ Email service is ready (Brevo API, sender: ${senderEmail})`);
+} else {
+  transporter.verify((error) => {
+    if (error) {
+      console.error('❌ Email service configuration error:', error);
+    } else {
+      console.log('✅ Email service is ready (SMTP)');
+    }
+  });
+}
+
+// Send one email through the configured provider
+const deliver = async ({ to, subject, html }) => {
+  if (!useBrevo) {
+    return transporter.sendMail({ from: `"ThinkAuto Support" <${senderEmail}>`, to, subject, html });
   }
-});
+
+  const response = await fetch('https://api.brevo.com/v3/smtp/email', {
+    method: 'POST',
+    headers: {
+      'api-key': process.env.BREVO_API_KEY,
+      'Content-Type': 'application/json',
+      Accept: 'application/json'
+    },
+    body: JSON.stringify({
+      sender: { name: 'ThinkAuto Support', email: senderEmail },
+      to: [{ email: to }],
+      subject,
+      htmlContent: html
+    })
+  });
+
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(`Brevo API error ${response.status}: ${data.message || 'Unknown error'}`);
+  }
+  return { messageId: data.messageId, response: `Brevo ${response.status}` };
+};
 
 // Send ticket created notification to employee
 export const sendTicketCreatedEmail = async (employeeEmail, ticketData) => {
@@ -29,7 +65,6 @@ export const sendTicketCreatedEmail = async (employeeEmail, ticketData) => {
     console.log(`📧 Attempting to send email to employee: ${employeeEmail}`);
 
     const mailOptions = {
-      from: `"ThinkAuto Support" <${process.env.EMAIL_USER}>`,
       to: employeeEmail,
       subject: `Ticket Created Successfully - ${ticketData.ticketNumber}`,
       html: `
@@ -80,7 +115,7 @@ export const sendTicketCreatedEmail = async (employeeEmail, ticketData) => {
       `
     };
 
-    const info = await transporter.sendMail(mailOptions);
+    const info = await deliver(mailOptions);
     console.log(`✅ Employee email sent successfully to ${employeeEmail}`);
     console.log(`   Message ID: ${info.messageId}`);
     console.log(`   Response: ${info.response}`);
@@ -99,7 +134,6 @@ export const sendTicketAssignedEmail = async (technicianEmail, technicianName, t
     console.log(`📧 Attempting to send email to technician: ${technicianEmail}`);
 
     const mailOptions = {
-      from: `"ThinkAuto Support" <${process.env.EMAIL_USER}>`,
       to: technicianEmail,
       subject: `New Ticket Assigned - ${ticketData.ticketNumber}`,
       html: `
@@ -142,7 +176,7 @@ export const sendTicketAssignedEmail = async (technicianEmail, technicianName, t
               <p>📞 <strong>Action Required:</strong> Please contact the employee at <a href="mailto:${ticketData.createdBy.email}">${ticketData.createdBy.email}</a> to resolve this ${ticketData.priority} priority issue.</p>
               <p><strong>24-hour completion rule:</strong> Resolve the issue, request the employee OTP, and verify completion within 24 hours. Unverified tickets are marked as unsolved.</p>
               
-              <a href="http://localhost:8081/tickets/${ticketData._id}" class="action-btn">View & Update Ticket</a>
+              <a href="${primaryFrontendUrl}/technician/assigned-tickets" class="action-btn">View & Update Ticket</a>
               
               <p style="margin-top: 20px;">Best regards,<br>ThinkAuto System</p>
             </div>
@@ -152,7 +186,7 @@ export const sendTicketAssignedEmail = async (technicianEmail, technicianName, t
       `
     };
 
-    const info = await transporter.sendMail(mailOptions);
+    const info = await deliver(mailOptions);
     console.log(`✅ Technician email sent successfully to ${technicianEmail}`);
     console.log(`   Message ID: ${info.messageId}`);
     console.log(`   Response: ${info.response}`);
@@ -169,7 +203,6 @@ export const sendTicketAssignedEmail = async (technicianEmail, technicianName, t
 export const sendOTPEmail = async (employeeEmail, employeeName, ticketData, otp) => {
   try {
     const mailOptions = {
-      from: `"ThinkAuto Support" <${process.env.EMAIL_USER}>`,
       to: employeeEmail,
       subject: `Ticket Completion Verification - ${ticketData.ticketNumber}`,
       html: `
@@ -224,7 +257,7 @@ export const sendOTPEmail = async (employeeEmail, employeeName, ticketData, otp)
       `
     };
 
-    await transporter.sendMail(mailOptions);
+    await deliver(mailOptions);
     console.log(`✅ OTP verification email sent to: ${employeeEmail}`);
     return { success: true };
   } catch (error) {

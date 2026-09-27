@@ -1,11 +1,9 @@
 import Ticket from '../models/Ticket.js';
 import User from '../models/User.js';
-import fetch from 'node-fetch';
 import { sendTicketCreatedEmail, sendTicketAssignedEmail, sendOTPEmail } from '../services/emailService.js';
 import { applyTicketDeadline, enforceTicketDeadlines } from '../services/ticketLifecycleService.js';
+import { analyzeIssue, findLeastLoadedTechnician } from '../services/ticketRoutingService.js';
 import { normalizeTicketStatus } from '../utils/ticketStatus.js';
-
-const ML_SERVICE_URL = process.env.ML_SERVICE_URL || 'http://localhost:5001';
 
 // @desc    Create new ticket with AI analysis
 // @route   POST /api/tickets
@@ -22,66 +20,10 @@ export const createTicket = async (req, res) => {
     }
 
     // Step 1: Analyze ticket using ML service
-    let category = 'Others';
-    let priority = 'Medium';
-    let assignedTeam = 'General Support Team';
+    const { category, priority, assignedTeam } = await analyzeIssue(description);
 
-    try {
-      const mlResponse = await fetch(`${ML_SERVICE_URL}/analyze`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ issue: description })
-      });
-
-      if (mlResponse.ok) {
-        const mlData = await mlResponse.json();
-        if (mlData.success) {
-          category = mlData.data.category;
-          priority = mlData.data.priority;
-          assignedTeam = mlData.data.assignedTeam;
-          console.log('✓ ML Analysis:', { category, priority, assignedTeam });
-        }
-      }
-    } catch (mlError) {
-      console.warn('⚠ ML service unavailable, using defaults:', mlError.message);
-    }
-
-    // Step 2: Auto-assign to technician with load-balancing and fallback
-    let assignedTechnician = null;
-    try {
-      // First try: case-insensitive department match
-      let technicians = await User.find({
-        role: 'technician',
-        isActive: true,
-        department: { $regex: new RegExp(`^${category}$`, 'i') }
-      });
-
-      // Fallback: any active technician if no category match
-      if (technicians.length === 0) {
-        console.log(`⚠ No ${category} specialist found, falling back to any active technician`);
-        technicians = await User.find({ role: 'technician', isActive: true });
-      }
-
-      if (technicians.length > 0) {
-        // Load-balance: assign to technician with fewest open tickets
-        const techLoads = await Promise.all(
-          technicians.map(async (tech) => {
-            const openCount = await Ticket.countDocuments({
-              assignedTo: tech._id,
-              status: { $in: ['Open', 'In Progress'] }
-            });
-            return { tech, load: openCount };
-          })
-        );
-        techLoads.sort((a, b) => a.load - b.load);
-        assignedTechnician = techLoads[0].tech;
-        console.log(`✓ Auto-assigned to technician: ${assignedTechnician.name} (load: ${techLoads[0].load} tickets)`);
-      } else {
-        console.log('⚠ No technicians found in the system');
-      }
-    } catch (assignError) {
-      console.warn('⚠ Auto-assignment failed:', assignError.message);
-    }
+    // Step 2: Auto-assign to the least-loaded technician in the matching department
+    const assignedTechnician = await findLeastLoadedTechnician(category);
 
     // Step 3: Generate title from description (first 50 chars)
     const title = description.length > 50

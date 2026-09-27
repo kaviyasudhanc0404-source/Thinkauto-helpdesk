@@ -1,5 +1,7 @@
 flask==3.0.0
 flask-cors==4.0.0
-scikit-learn
-pandas
-numpy
+# Pinned to the version domain_model.pkl was trained with — a different version may fail to load it
+scikit-learn==1.6.1
+numpy==2.2.6
+# Production WSGI server used on Render
+gunicorn==23.0.0

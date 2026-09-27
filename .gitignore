@@ -1,0 +1,27 @@
+# Dependencies
+node_modules/
+.venv/
+venv/
+__pycache__/
+*.pyc
+
+# Secrets — never commit real env files
+.env
+.env.local
+.env.*.local
+
+# Build output
+dist/
+build/
+
+# Logs and scratch files
+*.log
+server-log.txt
+server-error.txt
+.tmp-*
+
+# Editor / OS
+.DS_Store
+Thumbs.db
+.idea/
+
