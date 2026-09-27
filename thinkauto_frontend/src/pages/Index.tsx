@@ -242,38 +242,55 @@ const Index = () => {
       </section>
 
       {/* Features */}
-      <section className="relative z-10 max-w-6xl mx-auto px-4 sm:px-6 pb-16 sm:pb-20">
-        <div className="feature-flow">
-          {features.map((feature, i) => (
-            <div key={feature.title} className="feature-flow-item">
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.3 + i * 0.1 }}
-                whileHover={{ y: -7, scale: 1.015 }}
-                className="feature-card glass rounded-2xl p-5 sm:p-6 group backdrop-blur-xl border border-border/50"
-              >
-                <div className="feature-step" aria-hidden="true">
-                  {String(i + 1).padStart(2, "0")}
-                </div>
-                <div className="gradient-primary rounded-xl p-2.5 w-fit mb-3 sm:mb-4 group-hover:glow-orange transition-all shadow-lg">
-                  <feature.icon className="w-4 sm:w-5 h-4 sm:h-5 text-primary-foreground" />
-                </div>
-                <h3 className="font-display font-semibold text-foreground mb-1 text-sm sm:text-base">{feature.title}</h3>
-                <p className="text-xs sm:text-sm text-muted-foreground">{feature.desc}</p>
-              </motion.div>
-
-              {i < features.length - 1 && (
-                <div className="feature-connector" aria-hidden="true">
-                  <div className="feature-connector-track">
-                    <span className="feature-connector-pulse" />
+      <section className="relative z-10 pb-16 sm:pb-20">
+        {/* Mobile: infinite auto-scrolling marquee. sm+: normal padded grid */}
+        <div className="feature-flow-wrapper sm:max-w-6xl sm:mx-auto sm:px-6">
+          <div className="feature-flow">
+            {/* Original cards */}
+            {features.map((feature, i) => (
+              <div key={feature.title} className="feature-flow-item">
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.3 + i * 0.1 }}
+                  whileHover={{ y: -7, scale: 1.015 }}
+                  className="feature-card glass rounded-2xl p-5 sm:p-6 group backdrop-blur-xl border border-border/50"
+                >
+                  <div className="feature-step" aria-hidden="true">
+                    {String(i + 1).padStart(2, "0")}
                   </div>
-                  <ArrowRight className="feature-arrow feature-arrow-right" />
-                  <ArrowDown className="feature-arrow feature-arrow-down" />
+                  <div className="gradient-primary rounded-xl p-2.5 w-fit mb-3 sm:mb-4 group-hover:glow-orange transition-all shadow-lg">
+                    <feature.icon className="w-4 sm:w-5 h-4 sm:h-5 text-primary-foreground" />
+                  </div>
+                  <h3 className="font-display font-semibold text-foreground mb-1 text-sm sm:text-base">{feature.title}</h3>
+                  <p className="text-xs sm:text-sm text-muted-foreground">{feature.desc}</p>
+                </motion.div>
+
+                {i < features.length - 1 && (
+                  <div className="feature-connector" aria-hidden="true">
+                    <div className="feature-connector-track">
+                      <span className="feature-connector-pulse" />
+                    </div>
+                    <ArrowRight className="feature-arrow feature-arrow-right" />
+                    <ArrowDown className="feature-arrow feature-arrow-down" />
+                  </div>
+                )}
+              </div>
+            ))}
+            {/* Duplicate cards for seamless infinite loop (mobile only, hidden from screen readers) */}
+            {features.map((feature, i) => (
+              <div key={`clone-${feature.title}`} className="feature-flow-item" aria-hidden="true">
+                <div className="feature-card glass rounded-2xl p-5 group backdrop-blur-xl border border-border/50">
+                  <div className="feature-step">{String(i + 1).padStart(2, "0")}</div>
+                  <div className="gradient-primary rounded-xl p-2.5 w-fit mb-3 group-hover:glow-orange transition-all shadow-lg">
+                    <feature.icon className="w-4 h-4 text-primary-foreground" />
+                  </div>
+                  <h3 className="font-display font-semibold text-foreground mb-1 text-sm">{feature.title}</h3>
+                  <p className="text-xs text-muted-foreground">{feature.desc}</p>
                 </div>
-              )}
-            </div>
-          ))}
+              </div>
+            ))}
+          </div>
         </div>
       </section>
     </div>

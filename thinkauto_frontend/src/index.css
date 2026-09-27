@@ -133,6 +133,21 @@
   .responsive-panel {
     @apply rounded-2xl p-4 sm:p-5;
   }
+
+  /* Wraps tables so they scroll horizontally on small screens */
+  .table-responsive {
+    @apply w-full overflow-x-auto;
+  }
+
+  /* Two-column form grid: single column on mobile, two columns on sm+ */
+  .form-grid {
+    @apply grid grid-cols-1 gap-3 sm:grid-cols-2;
+  }
+
+  /* Minimum 44×44px tap target for interactive elements (WCAG 2.5.5) */
+  .touch-target {
+    @apply min-h-[2.75rem] min-w-[2.75rem] p-2;
+  }
 }
 
 html,
@@ -166,16 +181,37 @@ body {
   100% { opacity: 1; transform: translateX(0); }
 }
 
-/* Landing page feature flow */
+/* Landing page feature flow — auto-scrolling marquee on mobile, grid on larger screens */
+
+/* Mobile wrapper: clips the scrolling track */
+.feature-flow-wrapper {
+  overflow: hidden;
+  /* Fade edges for a polished marquee look */
+  mask-image: linear-gradient(to right, transparent 0%, black 8%, black 92%, transparent 100%);
+  -webkit-mask-image: linear-gradient(to right, transparent 0%, black 8%, black 92%, transparent 100%);
+}
+
+/* Mobile: the animated flex track */
 .feature-flow {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 3.25rem;
+  display: flex;
+  flex-direction: row;
+  gap: 1rem;
+  width: max-content;
+  animation: marquee-scroll 14s linear infinite;
+  padding: 0.5rem 0.5rem 1.5rem;
+}
+
+/* Pause on hover (desktop) / touch (mobile) */
+.feature-flow:hover {
+  animation-play-state: paused;
 }
 
 .feature-flow-item {
   position: relative;
   min-width: 0;
+  /* Mobile card size */
+  flex: 0 0 72vw;
+  max-width: 240px;
 }
 
 .feature-card {
@@ -265,6 +301,17 @@ body {
   transform: translateX(-50%);
 }
 
+/* Infinite marquee keyframe — slides the 8-card track left by 50% (= 4 cards) */
+@keyframes marquee-scroll {
+  0%   { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+
+/* Hide connectors on mobile marquee */
+.feature-connector {
+  display: none;
+}
+
 @keyframes feature-pulse-x {
   0% { left: -0.35rem; opacity: 0; }
   20%, 80% { opacity: 1; }
@@ -278,10 +325,38 @@ body {
 }
 
 @media (min-width: 640px) {
+  /* Wrapper: passthrough on sm+ */
+  .feature-flow-wrapper {
+    overflow: visible;
+    mask-image: none;
+    -webkit-mask-image: none;
+  }
+
+  /* Stop animation, switch to 2-col grid */
   .feature-flow {
+    display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
     column-gap: 3rem;
     row-gap: 3.5rem;
+    width: auto;
+    animation: none;
+    padding: 0;
+  }
+
+  /* Reset card sizing */
+  .feature-flow-item {
+    flex: unset;
+    max-width: unset;
+  }
+
+  /* Hide clone cards — only needed for mobile marquee */
+  .feature-flow-item[aria-hidden="true"] {
+    display: none;
+  }
+
+  /* Restore connectors */
+  .feature-connector {
+    display: block;
   }
 
   .feature-flow-item:nth-child(1) .feature-connector,

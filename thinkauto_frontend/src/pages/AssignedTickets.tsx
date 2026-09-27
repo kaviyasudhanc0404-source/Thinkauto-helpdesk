@@ -61,7 +61,7 @@ const AssignedTickets = () => {
           <Loader2 className="w-8 h-8 animate-spin text-primary" />
         </div>
       ) : (
-        <div className="space-y-3">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {filtered.map((ticket, i) => (
             <motion.div key={ticket._id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }}>
               <TicketCard 
@@ -77,7 +77,7 @@ const AssignedTickets = () => {
             </motion.div>
           ))}
           {filtered.length === 0 && (
-            <p className="text-muted-foreground text-sm text-center py-12">
+            <p className="text-muted-foreground text-sm text-center py-12 col-span-full">
               {tickets.length === 0 ? "No tickets assigned to you yet." : "No tickets match your search."}
             </p>
           )}

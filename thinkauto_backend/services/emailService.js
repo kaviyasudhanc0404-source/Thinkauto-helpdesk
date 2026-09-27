@@ -27,7 +27,7 @@ transporter.verify((error, success) => {
 export const sendTicketCreatedEmail = async (employeeEmail, ticketData) => {
   try {
     console.log(`📧 Attempting to send email to employee: ${employeeEmail}`);
-    
+
     const mailOptions = {
       from: `"ThinkAuto Support" <${process.env.EMAIL_USER}>`,
       to: employeeEmail,
@@ -97,7 +97,7 @@ export const sendTicketCreatedEmail = async (employeeEmail, ticketData) => {
 export const sendTicketAssignedEmail = async (technicianEmail, technicianName, ticketData) => {
   try {
     console.log(`📧 Attempting to send email to technician: ${technicianEmail}`);
-    
+
     const mailOptions = {
       from: `"ThinkAuto Support" <${process.env.EMAIL_USER}>`,
       to: technicianEmail,

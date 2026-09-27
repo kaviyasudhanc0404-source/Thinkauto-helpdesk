@@ -238,7 +238,7 @@ const Signup = () => {
         initial={{ opacity: 0, y: 30 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.6 }}
-        className="relative z-10 w-full max-w-lg"
+        className="relative z-10 w-full max-w-xl"
       >
         <motion.div 
           className="text-center mb-8"
@@ -299,7 +299,7 @@ const Signup = () => {
               </p>
             </div>
 
-            <div className="flex flex-col gap-5">
+            <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
               <div>
                 <label className="text-sm font-semibold text-foreground mb-2 block">Username</label>
                 <input

@@ -291,7 +291,7 @@ class EmailTicketService {
 
   async processEmail(item, connection) {
     const id = item.attributes.uid;
-    
+
     try {
       const all = item.parts.find(part => part.which === '');
       const idHeader = `Imap-Id: ${id}\r\n`;
@@ -325,9 +325,9 @@ class EmailTicketService {
       }
 
       // Find REGISTERED employee only (DO NOT auto-create) - case-insensitive email search
-      let user = await User.findOne({ 
-        email: { $regex: new RegExp(`^${senderEmail}$`, 'i') }, 
-        role: 'employee' 
+      let user = await User.findOne({
+        email: { $regex: new RegExp(`^${senderEmail}$`, 'i') },
+        role: 'employee'
       });
 
       if (!user) {
@@ -449,7 +449,7 @@ class EmailTicketService {
 
   detectPriority(description) {
     const text = description.toLowerCase();
-    
+
     const criticalKeywords = ['urgent', 'critical', 'emergency', 'down', 'not working', 'stopped', 'failed'];
     const highKeywords = ['important', 'asap', 'priority', 'serious', 'broken'];
     const lowKeywords = ['when possible', 'low priority', 'minor', 'cosmetic'];
@@ -463,7 +463,7 @@ class EmailTicketService {
     if (lowKeywords.some(keyword => text.includes(keyword))) {
       return 'Low';
     }
-    
+
     return 'Medium';
   }
 
@@ -507,10 +507,10 @@ class EmailTicketService {
 
       // Sort by load (ascending) and return least loaded technician
       technicianLoads.sort((a, b) => a.load - b.load);
-      
+
       const selectedTech = technicianLoads[0].technician;
       console.log(`   👨‍🔧 Assigned to: ${selectedTech.name} (${selectedTech.email}) - Current load: ${technicianLoads[0].load} tickets`);
-      
+
       return selectedTech;
     } catch (error) {
       console.error('Error finding technician:', error);

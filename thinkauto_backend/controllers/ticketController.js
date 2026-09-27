@@ -25,14 +25,14 @@ export const createTicket = async (req, res) => {
     let category = 'Others';
     let priority = 'Medium';
     let assignedTeam = 'General Support Team';
-    
+
     try {
       const mlResponse = await fetch(`${ML_SERVICE_URL}/analyze`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ issue: description })
       });
-      
+
       if (mlResponse.ok) {
         const mlData = await mlResponse.json();
         if (mlData.success) {
@@ -46,30 +46,46 @@ export const createTicket = async (req, res) => {
       console.warn('⚠ ML service unavailable, using defaults:', mlError.message);
     }
 
-    // Step 2: Auto-assign to available technician in the category domain
+    // Step 2: Auto-assign to technician with load-balancing and fallback
     let assignedTechnician = null;
     try {
-      const technicians = await User.find({
+      // First try: case-insensitive department match
+      let technicians = await User.find({
         role: 'technician',
         isActive: true,
-        isAvailable: true,
-        department: category
-      }).sort({ lastLogin: -1 });
+        department: { $regex: new RegExp(`^${category}$`, 'i') }
+      });
+
+      // Fallback: any active technician if no category match
+      if (technicians.length === 0) {
+        console.log(`⚠ No ${category} specialist found, falling back to any active technician`);
+        technicians = await User.find({ role: 'technician', isActive: true });
+      }
 
       if (technicians.length > 0) {
-        // Assign to the most recently active technician
-        assignedTechnician = technicians[0]._id;
-        console.log(`✓ Auto-assigned to technician: ${technicians[0].name}`);
+        // Load-balance: assign to technician with fewest open tickets
+        const techLoads = await Promise.all(
+          technicians.map(async (tech) => {
+            const openCount = await Ticket.countDocuments({
+              assignedTo: tech._id,
+              status: { $in: ['Open', 'In Progress'] }
+            });
+            return { tech, load: openCount };
+          })
+        );
+        techLoads.sort((a, b) => a.load - b.load);
+        assignedTechnician = techLoads[0].tech;
+        console.log(`✓ Auto-assigned to technician: ${assignedTechnician.name} (load: ${techLoads[0].load} tickets)`);
       } else {
-        console.log('⚠ No available technicians found for', category);
+        console.log('⚠ No technicians found in the system');
       }
     } catch (assignError) {
       console.warn('⚠ Auto-assignment failed:', assignError.message);
     }
 
     // Step 3: Generate title from description (first 50 chars)
-    const title = description.length > 50 
-      ? description.substring(0, 50) + '...' 
+    const title = description.length > 50
+      ? description.substring(0, 50) + '...'
       : description;
 
     // Step 4: Create ticket
@@ -79,7 +95,7 @@ export const createTicket = async (req, res) => {
       category,
       priority,
       createdBy: req.user._id,
-      assignedTo: assignedTechnician
+      assignedTo: assignedTechnician ? assignedTechnician._id : null
     });
 
     await ticket.populate([
@@ -87,27 +103,39 @@ export const createTicket = async (req, res) => {
       { path: 'assignedTo', select: 'name email role department phoneNumber' }
     ]);
 
-    // Step 5: Send email notifications
+    // Step 5: Send email notifications (non-blocking — ticket is created regardless)
     try {
-      // Email to employee
-      await sendTicketCreatedEmail(ticket.createdBy.email, ticket);
-      
+      // Email to employee who raised the ticket
+      const empResult = await sendTicketCreatedEmail(ticket.createdBy.email, ticket);
+      if (empResult.success) {
+        console.log(`✉ Employee email sent to: ${ticket.createdBy.email}`);
+      } else {
+        console.warn(`⚠ Employee email failed: ${empResult.error}`);
+      }
+
       // Email to assigned technician
       if (ticket.assignedTo) {
-        await sendTicketAssignedEmail(
+        const techResult = await sendTicketAssignedEmail(
           ticket.assignedTo.email,
           ticket.assignedTo.name,
           ticket
         );
+        if (techResult.success) {
+          console.log(`✉ Technician email sent to: ${ticket.assignedTo.email}`);
+        } else {
+          console.warn(`⚠ Technician email failed: ${techResult.error}`);
+        }
+      } else {
+        console.warn('⚠ No technician assigned — skipping technician email');
       }
     } catch (emailError) {
-      console.warn('⚠ Email notification failed:', emailError.message);
+      console.warn('⚠ Email notification error:', emailError.message);
     }
 
     res.status(201).json({
       success: true,
       message: 'Ticket created successfully',
-      data: { 
+      data: {
         ticket,
         mlAnalysis: {
           category,
@@ -228,8 +256,8 @@ export const updateTicket = async (req, res) => {
     }
 
     // Check authorization for technician
-    if (req.user.role === 'technician' && 
-        ticket.assignedTo && 
+    if (req.user.role === 'technician' &&
+        ticket.assignedTo &&
         ticket.assignedTo.toString() !== req.user._id.toString()) {
       return res.status(403).json({
         success: false,

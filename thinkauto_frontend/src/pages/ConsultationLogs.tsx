@@ -62,11 +62,12 @@ const ConsultationLogs = () => {
             source: "ticket",
             user: ticket.createdBy,
             userMessage: ticket.description,
-            aiResponse: ticket.resolution?.text || ticket.aiSuggestions?.category
+            aiResponse: ticket.assignedTo
+              ? `Assigned to ${ticket.assignedTo.name}. Category: ${ticket.category || 'N/A'}, Priority: ${ticket.priority || 'N/A'}.`
+              : ticket.category
               ? `Ticket categorized as ${ticket.category} with ${ticket.priority} priority.`
-              : ticket.assignedTo
-                ? `Assigned to ${ticket.assignedTo.name}.`
-                : "Created as a helpdesk ticket.",
+              : "Created as a helpdesk ticket.",
+            // 'failed' only for explicitly unsolved; open/in-progress = 'open', resolved = 'success'
             status: isUnsolvedStatus(ticket) ? "failed" : isResolvedStatus(ticket) ? "success" : "open",
             createdAt: ticket.createdAt,
             usage: { total_tokens: 0 },
@@ -88,7 +89,17 @@ const ConsultationLogs = () => {
     return () => window.clearInterval(timer);
   }, []);
 
-  const displayLogs = logs.length > 0 ? logs : ticketLogs;
+  // Merge chatbot logs + ticket consultations — show ALL user activity
+  const displayLogs = useMemo(() => {
+    const combined = [
+      ...logs.map((l) => ({ ...l, source: l.source || "chat" })),
+      ...ticketLogs,
+    ];
+    // Sort newest first
+    return combined.sort(
+      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    );
+  }, [logs, ticketLogs]);
 
   const filteredLogs = useMemo(
     () =>
@@ -106,7 +117,8 @@ const ConsultationLogs = () => {
 
   const stats = {
     total: displayLogs.length,
-    successful: displayLogs.filter((log) => log.status !== "failed").length,
+    // successful = resolved tickets + successful chatbot logs + open/in-progress tickets
+    successful: displayLogs.filter((log) => log.status === "success" || log.status === "open").length,
     failed: displayLogs.filter((log) => log.status === "failed").length,
     today: displayLogs.filter((log) => new Date(log.createdAt).toDateString() === new Date().toDateString()).length,
   };
@@ -180,7 +192,7 @@ const ConsultationLogs = () => {
                   <div className="space-y-1">
                     <CardTitle className="text-xl">History overview</CardTitle>
                     <CardDescription>
-                      {logs.length > 0 ? "AI chatbot interactions" : "Helpdesk consultations"}
+                      All user interactions — chatbot &amp; helpdesk tickets
                     </CardDescription>
                   </div>
                 </div>

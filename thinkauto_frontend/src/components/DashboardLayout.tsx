@@ -32,7 +32,7 @@ const DashboardLayout = ({ children, title }: { children: ReactNode; title: stri
         </div>
 
         {/* Content */}
-        <main className="mx-auto w-full max-w-7xl px-4 pb-24 pt-2 sm:px-6">
+        <main className="mx-auto w-full max-w-7xl px-4 pb-28 pt-2 sm:px-6 sm:pb-24">
           {children}
         </main>
       </div>

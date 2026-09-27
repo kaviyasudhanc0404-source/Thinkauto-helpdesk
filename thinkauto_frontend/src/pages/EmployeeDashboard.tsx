@@ -95,7 +95,7 @@ const EmployeeDashboard = () => {
   return (
     <DashboardLayout title={`Welcome back, ${userName}! 👋`}>
       {/* Quick Actions */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8">
         {quickActions.map((action, i) => (
           <motion.button
             key={action.label}
