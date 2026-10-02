@@ -98,62 +98,55 @@ class EmailTicketService {
     return true;
   }
 
-  async testConnection() {
-    let connection = null;
-    let errorHandled = false;
+  // Connect to IMAP with a timeout. Error listeners are attached to both the
+  // imap-simple wrapper and the raw node-imap connection and are never removed:
+  // Gmail often resets the socket (ECONNRESET) after LOGOUT, and an 'error'
+  // event emitted with no listener is thrown as an uncaught exception.
+  async connect(label) {
+    let timer;
+    const connectPromise = imaps.connect(this.config).then((conn) => {
+      const onError = (err) => {
+        if (err && err.code === 'ECONNRESET') return; // expected on close
+        console.error(`${label} error: ${err.message}`);
+      };
+      conn.on('error', onError);
+      conn.imap.on('error', onError);
+      return conn;
+    });
 
     try {
-      console.log('   Testing IMAP connection...');
-
-      // Connect with error handling
-      connection = await Promise.race([
-        (async () => {
-          const conn = await imaps.connect(this.config);
-
-          // CRITICAL: Attach error handler immediately to prevent crashes
-          if (conn && conn.imap) {
-            conn.imap.on('error', (err) => {
-              if (!errorHandled) {
-                errorHandled = true;
-                console.error(`   IMAP connection error: ${err.message}`);
-              }
-            });
-          }
-
-          return conn;
-        })(),
-        new Promise((_, reject) =>
-          setTimeout(() => reject(new Error('Connection timeout after 30s')), 30000)
-        )
+      return await Promise.race([
+        connectPromise,
+        new Promise((_, reject) => {
+          timer = setTimeout(() => reject(new Error('Connection timeout after 30s')), 30000);
+        })
       ]);
+    } catch (error) {
+      // If the connect finishes after the timeout fired, close that connection too
+      connectPromise.then((conn) => this.closeConnection(conn)).catch(() => {});
+      throw error;
+    } finally {
+      clearTimeout(timer);
+    }
+  }
 
-      // Test successful - close connection
-      if (connection) {
-        try {
-          await connection.end();
-        } catch (endError) {
-          // Ignore errors when closing - connection might already be closed
-        }
-      }
+  closeConnection(connection) {
+    if (!connection) return;
+    try {
+      connection.end();
+    } catch (e) {
+      // Ignore - connection might already be closed
+    }
+  }
 
+  async testConnection() {
+    try {
+      console.log('   Testing IMAP connection...');
+      const connection = await this.connect('   IMAP connection');
+      this.closeConnection(connection);
       return true;
     } catch (error) {
-      errorHandled = true;
       console.error(`   Connection test failed: ${error.message}`);
-
-      // Try to close connection if it exists
-      if (connection) {
-        try {
-          // Remove error listeners before closing
-          if (connection.imap) {
-            connection.imap.removeAllListeners('error');
-          }
-          await connection.end();
-        } catch (e) {
-          // Ignore - connection might already be closed
-        }
-      }
-
       return false;
     }
   }
@@ -175,30 +168,9 @@ class EmailTicketService {
     }
 
     let connection = null;
-    let errorHandled = false;
 
     try {
-      // Connect to IMAP with timeout and error handling
-      connection = await Promise.race([
-        (async () => {
-          const conn = await imaps.connect(this.config);
-
-          // CRITICAL: Attach error handler immediately to prevent crashes
-          if (conn && conn.imap) {
-            conn.imap.on('error', (err) => {
-              if (!errorHandled) {
-                errorHandled = true;
-                console.error(`IMAP error: ${err.message}`);
-              }
-            });
-          }
-
-          return conn;
-        })(),
-        new Promise((_, reject) =>
-          setTimeout(() => reject(new Error('Connection timeout')), 30000)
-        )
-      ]);
+      connection = await this.connect('IMAP');
 
       // Open inbox
       await connection.openBox('INBOX');
@@ -217,15 +189,7 @@ class EmailTicketService {
       const messages = await connection.search(searchCriteria, fetchOptions);
 
       if (messages.length === 0) {
-        // Close connection properly
-        try {
-          if (connection.imap) {
-            connection.imap.removeAllListeners('error');
-          }
-          await connection.end();
-        } catch (endError) {
-          // Ignore close errors
-        }
+        this.closeConnection(connection);
         // Reset error counter on successful connection
         this.consecutiveErrors = 0;
         return;
@@ -242,21 +206,12 @@ class EmailTicketService {
         }
       }
 
-      // Close connection properly
-      try {
-        if (connection.imap) {
-          connection.imap.removeAllListeners('error');
-        }
-        await connection.end();
-      } catch (endError) {
-        // Ignore close errors
-      }
+      this.closeConnection(connection);
 
       // Reset error counter on successful check
       this.consecutiveErrors = 0;
 
     } catch (error) {
-      errorHandled = true;
       this.consecutiveErrors++;
 
       if (error.message.includes('Timed out') || error.message.includes('ECONNRESET') || error.message.includes('EPIPE') || error.message.includes('timeout')) {
@@ -265,17 +220,7 @@ class EmailTicketService {
         console.error(`❌ Error checking emails (${this.consecutiveErrors}/${this.maxConsecutiveErrors}):`, error.message);
       }
 
-      if (connection) {
-        try {
-          // Remove error listeners before closing
-          if (connection.imap) {
-            connection.imap.removeAllListeners('error');
-          }
-          await connection.end();
-        } catch (e) {
-          // Ignore connection close errors
-        }
-      }
+      this.closeConnection(connection);
 
       // If too many consecutive errors, suggest troubleshooting
       if (this.consecutiveErrors >= this.maxConsecutiveErrors - 1) {

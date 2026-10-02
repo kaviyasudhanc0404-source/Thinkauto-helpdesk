@@ -33,6 +33,14 @@ import { useToast } from "@/hooks/use-toast";
 import api from "@/lib/api";
 import { isResolvedStatus, isUnsolvedStatus } from "@/lib/ticketStatus";
 
+// Fixed two-line preview so every history card has the same height; the dialog shows the full text.
+const MessagePreview = ({ label, text }: { label: string; text?: string }) => (
+  <div className="rounded-2xl border border-border/40 bg-background/30 p-3">
+    <p className="text-[11px] font-medium text-muted-foreground mb-1">{label}</p>
+    <p className="text-sm text-foreground h-[2lh] line-clamp-2 break-words">{text || "—"}</p>
+  </div>
+);
+
 const ConsultationLogs = () => {
   const [logs, setLogs] = useState([]);
   const [ticketLogs, setTicketLogs] = useState([]);
@@ -341,14 +349,15 @@ const ConsultationLogs = () => {
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: Math.min(index * 0.02, 0.25) }}
+                    className="h-full"
                   >
                     <button
                       type="button"
                       onClick={() => setSelectedLog(log)}
-                      className="w-full text-left"
+                      className="w-full h-full text-left"
                     >
-                      <Card className="glass border-border/50 hover:bg-secondary/10 transition-colors">
-                        <CardContent className="p-5">
+                      <Card className="glass border-border/50 hover:bg-secondary/10 transition-colors h-full">
+                        <CardContent className="p-5 h-full flex flex-col">
                           <div className="flex flex-col items-start gap-3 min-[420px]:flex-row min-[420px]:justify-between min-[420px]:gap-4">
                             <div className="flex items-start gap-3 min-w-0">
                               <div className={`${tone.dotClassName} rounded-2xl p-2.5 shrink-0`}>
@@ -376,17 +385,11 @@ const ConsultationLogs = () => {
                           </div>
 
                           <div className="mt-4 grid gap-3">
-                            <div className="rounded-2xl border border-border/40 bg-background/30 p-3">
-                              <p className="text-[11px] font-medium text-muted-foreground mb-1">User message</p>
-                              <p className="text-sm text-foreground whitespace-pre-wrap line-clamp-3">{log.userMessage || "—"}</p>
-                            </div>
-                            <div className="rounded-2xl border border-border/40 bg-background/30 p-3">
-                              <p className="text-[11px] font-medium text-muted-foreground mb-1">AI response</p>
-                              <p className="text-sm text-foreground/90 whitespace-pre-wrap line-clamp-3">{log.aiResponse || "—"}</p>
-                            </div>
+                            <MessagePreview label="User message" text={log.userMessage} />
+                            <MessagePreview label="AI response" text={log.aiResponse} />
                           </div>
 
-                          <div className="mt-4 flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
+                          <div className="mt-auto pt-4 flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
                             <span>Click to view full details</span>
                             <span>{log.usage?.total_tokens || 0} tokens</span>
                           </div>
