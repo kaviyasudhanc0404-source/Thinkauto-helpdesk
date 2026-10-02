@@ -44,7 +44,7 @@ In most companies, IT support is slow because someone has to read every request,
 - **Email notifications** — confirmation to the employee, assignment notice to the technician, and a verification OTP when work is done.
 - **OTP-verified closing** — a technician can mark a ticket Resolved only with the OTP sent to the employee.
 - **24-hour SLA** — every ticket must be resolved and verified within 24 hours, or it is marked Unsolved.
-- **AI chatbot** — a built-in assistant (powered by Groq) that answers IT questions instantly; conversations are saved in History.
+- **AI chatbot** — a built-in assistant (powered by Groq) on every page, even before signing in. It answers questions about ThinkAuto and IT problems only, and conversations are never stored.
 - **Role-based dashboards** — separate views for Employees, Technicians and Admins.
 - **Analytics & reports** — charts, SLA monitoring and CSV export for admins.
 - **Interactive demo** — the **Watch Demo** button on the home page walks through both ticket flows step by step.
@@ -100,7 +100,7 @@ Ticket numbers look like `TKT-000123`. The OTP is 6 digits and is valid for 15 m
 
 | Role | How to get it | What they can do |
 |---|---|---|
-| **Employee** | Sign up and choose "Employee" | Raise tickets (panel or email), track them in My Tickets, use the AI chatbot, view chat History, edit profile |
+| **Employee** | Sign up and choose "Employee" | Raise tickets (panel or email), track them in My Tickets, use the AI chatbot, view ticket History, edit profile |
 | **Technician** | Sign up and choose "Technician", or created by an Admin | See assigned tickets, update status, request and enter the completion OTP, use the chatbot, set availability |
 | **Admin** | Created by the seed script (not available on the sign-up page) | See all tickets, reassign tickets, manage employees and technicians, view analytics, reports and SLA monitor, export data |
 
@@ -113,7 +113,7 @@ Ticket numbers look like `TKT-000123`. The OTP is 6 digits and is valid for 15 m
 | Dashboard | Dashboard | Command Center (dashboard) |
 | Raise Ticket | Assigned Tickets | All Tickets |
 | My Tickets | Update Status | Assign Tickets |
-| History (chatbot logs) | History | Analytics |
+| History (ticket history) | History | Analytics |
 | Profile | Profile | Technicians |
 | | | Employees |
 | | | Reports |
@@ -152,7 +152,7 @@ ThinkAuto has three parts, each running as its own service:
 | **Frontend** | `thinkauto_frontend` | Website: home page, sign-in, dashboards, chatbot |
 | **Backend** | `thinkauto_backend` | Accounts, tickets, routing, SLA rules, emails, email-to-ticket listener, chatbot proxy |
 | **ML Service** | `ml_services` | Predicts ticket category and priority from the issue text |
-| **Database** | MongoDB Atlas | Stores users, tickets and chat logs |
+| **Database** | MongoDB Atlas | Stores users and tickets |
 
 **The AI model:** a TF-IDF + Logistic Regression classifier (scikit-learn) trained on 1,000 sample IT tickets (`synthetic_tickets_1000.csv`, training notebook `Untitled14.ipynb`). It predicts one of six categories; priority comes from keyword rules. If the ML service is unreachable, tickets are still created with category `Others` and a keyword-based priority.
 
@@ -189,7 +189,7 @@ AI_SMARTHELPDESK/
 ├── thinkauto_backend/           # Node.js API
 │   ├── server.js                # Entry point, CORS, starts email listener
 │   ├── config/database.js       # MongoDB connection
-│   ├── models/                  # User, Ticket, ChatLog
+│   ├── models/                  # User, Ticket
 │   ├── controllers/             # Auth, tickets, users, chatbot logic
 │   ├── routes/                  # API endpoints
 │   ├── middleware/auth.js       # JWT check + role permissions
@@ -357,8 +357,7 @@ All endpoints except sign-up, login and health need the header `Authorization: B
 
 | Method | Endpoint | Who | Description |
 |---|---|---|---|
-| POST | `/message` | Logged in | Send a message to the AI assistant |
-| GET | `/logs` | Logged in | Chat history |
+| POST | `/message` | Anyone | Send a message to the AI assistant |
 
 ### Other
 

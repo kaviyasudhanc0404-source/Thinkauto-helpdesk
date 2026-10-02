@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { MessageCircle, X, Send, Bot, Sparkles, Loader2, Trash2, Minimize2, Maximize2 } from "lucide-react";
+import { MessageCircle, X, Send, Sparkles, Loader2, Trash2, Minimize2, Maximize2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import api from "@/lib/api";
 
@@ -10,16 +10,15 @@ interface Message {
   timestamp: Date;
 }
 
+const WELCOME_TEXT =
+  "Hi! I'm ThinkAuto AI. I can help you with:\n\n• Using ThinkAuto — signing up, raising tickets, tracking status\n• Raising a ticket by email\n• Quick fixes for network, hardware, software and access issues\n\nHow can I help you today?";
+
+const welcomeMessage = (): Message => ({ role: "bot", text: WELCOME_TEXT, timestamp: new Date() });
+
 const ChatBot = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [isMinimized, setIsMinimized] = useState(false);
-  const [messages, setMessages] = useState<Message[]>([
-    { 
-      role: "bot", 
-      text: "Hi! I'm ThinkAuto AI, your intelligent IT helpdesk assistant. I can help you with:\n\n• Technical troubleshooting\n• Software issues\n• Hardware problems\n• Network connectivity\n• Access requests\n• General IT queries\n\nHow can I assist you today?",
-      timestamp: new Date()
-    },
-  ]);
+  const [messages, setMessages] = useState<Message[]>(() => [welcomeMessage()]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -44,7 +43,7 @@ const ChatBot = () => {
       });
 
       return response.response || "I apologize, but I couldn't generate a response. Please try again.";
-    } catch (error: any) {
+    } catch (error) {
       console.error("Chat API error:", error);
       return "I'm having trouble connecting right now. Please try again in a moment or create a support ticket for immediate assistance.";
     }
@@ -88,13 +87,7 @@ const ChatBot = () => {
   };
 
   const clearChat = () => {
-    setMessages([
-      { 
-        role: "bot", 
-        text: "Hi! I'm ThinkAuto AI, your intelligent IT helpdesk assistant. How can I assist you today?",
-        timestamp: new Date()
-      },
-    ]);
+    setMessages([welcomeMessage()]);
     toast({
       title: "Chat cleared",
       description: "Conversation history has been reset.",

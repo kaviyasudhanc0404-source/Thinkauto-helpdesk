@@ -42,8 +42,7 @@ const MessagePreview = ({ label, text }: { label: string; text?: string }) => (
 );
 
 const ConsultationLogs = () => {
-  const [logs, setLogs] = useState([]);
-  const [ticketLogs, setTicketLogs] = useState([]);
+  const [displayLogs, setDisplayLogs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
@@ -51,40 +50,33 @@ const ConsultationLogs = () => {
   const [selectedLog, setSelectedLog] = useState(null);
   const { toast } = useToast();
 
+  // History shows helpdesk tickets only, newest first
   const fetchLogs = async () => {
     try {
       setError("");
-      const [chatResponse, ticketResponse] = await Promise.all([
-        api.getChatLogs(),
-        api.getTickets(),
-      ]);
+      const response = await api.getTickets();
 
-      if (chatResponse.success) {
-        setLogs(chatResponse.data.logs || []);
-      }
-
-      if (ticketResponse.success) {
-        setTicketLogs(
-          (ticketResponse.data.tickets || []).map((ticket) => ({
-            _id: `ticket-${ticket._id}`,
-            source: "ticket",
-            user: ticket.createdBy,
-            userMessage: ticket.description,
-            aiResponse: ticket.assignedTo
-              ? `Assigned to ${ticket.assignedTo.name}. Category: ${ticket.category || 'N/A'}, Priority: ${ticket.priority || 'N/A'}.`
-              : ticket.category
-              ? `Ticket categorized as ${ticket.category} with ${ticket.priority} priority.`
-              : "Created as a helpdesk ticket.",
-            // 'failed' only for explicitly unsolved; open/in-progress = 'open', resolved = 'success'
-            status: isUnsolvedStatus(ticket) ? "failed" : isResolvedStatus(ticket) ? "success" : "open",
-            createdAt: ticket.createdAt,
-            usage: { total_tokens: 0 },
-          }))
+      if (response.success) {
+        setDisplayLogs(
+          (response.data.tickets || [])
+            .map((ticket) => ({
+              _id: ticket._id,
+              user: ticket.createdBy,
+              userMessage: ticket.description,
+              aiResponse: ticket.assignedTo
+                ? `Assigned to ${ticket.assignedTo.name}. Category: ${ticket.category || 'N/A'}, Priority: ${ticket.priority || 'N/A'}.`
+                : ticket.category
+                ? `Ticket categorized as ${ticket.category} with ${ticket.priority} priority.`
+                : "Created as a helpdesk ticket.",
+              // 'failed' only for explicitly unsolved; open/in-progress = 'open', resolved = 'success'
+              status: isUnsolvedStatus(ticket) ? "failed" : isResolvedStatus(ticket) ? "success" : "open",
+              createdAt: ticket.createdAt,
+            }))
+            .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
         );
       }
     } catch (fetchError) {
-      setLogs([]);
-      setTicketLogs([]);
+      setDisplayLogs([]);
       setError(fetchError.message || "Unable to load history from the backend.");
     } finally {
       setLoading(false);
@@ -96,18 +88,6 @@ const ConsultationLogs = () => {
     const timer = window.setInterval(fetchLogs, 10000);
     return () => window.clearInterval(timer);
   }, []);
-
-  // Merge chatbot logs + ticket consultations — show ALL user activity
-  const displayLogs = useMemo(() => {
-    const combined = [
-      ...logs.map((l) => ({ ...l, source: l.source || "chat" })),
-      ...ticketLogs,
-    ];
-    // Sort newest first
-    return combined.sort(
-      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-    );
-  }, [logs, ticketLogs]);
 
   const filteredLogs = useMemo(
     () =>
@@ -125,7 +105,7 @@ const ConsultationLogs = () => {
 
   const stats = {
     total: displayLogs.length,
-    // successful = resolved tickets + successful chatbot logs + open/in-progress tickets
+    // successful = resolved + open/in-progress tickets
     successful: displayLogs.filter((log) => log.status === "success" || log.status === "open").length,
     failed: displayLogs.filter((log) => log.status === "failed").length,
     today: displayLogs.filter((log) => new Date(log.createdAt).toDateString() === new Date().toDateString()).length,
@@ -200,7 +180,7 @@ const ConsultationLogs = () => {
                   <div className="space-y-1">
                     <CardTitle className="text-xl">History overview</CardTitle>
                     <CardDescription>
-                      All user interactions — chatbot &amp; helpdesk tickets
+                      All helpdesk tickets and how they were routed
                     </CardDescription>
                   </div>
                 </div>
@@ -322,7 +302,7 @@ const ConsultationLogs = () => {
             <CardContent className="p-12 text-center">
               <Bot className="w-16 h-16 mx-auto mb-4 text-muted-foreground opacity-50" />
               <h3 className="text-lg font-semibold text-foreground mb-2">No history entries found</h3>
-              <p className="text-sm text-muted-foreground">Chatbot conversations or helpdesk consultations will appear here.</p>
+              <p className="text-sm text-muted-foreground">Your helpdesk tickets will appear here.</p>
             </CardContent>
           </Card>
         ) : (
@@ -341,7 +321,6 @@ const ConsultationLogs = () => {
                 const StatusIcon = tone.icon;
                 const userName = log.user?.name || log.user?.username || "Unknown user";
                 const userEmail = log.user?.email || "No email";
-                const sourceLabel = log.source ? String(log.source) : "";
 
                 return (
                   <motion.div
@@ -366,13 +345,6 @@ const ConsultationLogs = () => {
                               <div className="min-w-0">
                                 <p className="font-semibold text-foreground truncate">{userName}</p>
                                 <p className="text-xs text-muted-foreground truncate">{userEmail}</p>
-                                {sourceLabel ? (
-                                  <div className="mt-2">
-                                    <Badge variant="outline" className="bg-background/30">
-                                      {sourceLabel}
-                                    </Badge>
-                                  </div>
-                                ) : null}
                               </div>
                             </div>
 
@@ -389,9 +361,8 @@ const ConsultationLogs = () => {
                             <MessagePreview label="AI response" text={log.aiResponse} />
                           </div>
 
-                          <div className="mt-auto pt-4 flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
-                            <span>Click to view full details</span>
-                            <span>{log.usage?.total_tokens || 0} tokens</span>
+                          <div className="mt-auto pt-4 text-xs text-muted-foreground">
+                            Click to view full details
                           </div>
                         </CardContent>
                       </Card>
@@ -412,7 +383,7 @@ const ConsultationLogs = () => {
                 </div>
                 History Details
               </DialogTitle>
-              <DialogDescription>Chatbot request and AI response</DialogDescription>
+              <DialogDescription>Ticket request and AI routing result</DialogDescription>
             </DialogHeader>
 
             {selectedLog && (

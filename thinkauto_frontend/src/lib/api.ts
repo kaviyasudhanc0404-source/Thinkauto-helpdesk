@@ -159,11 +159,6 @@ class ApiService {
     });
   }
 
-  async getChatLogs(params = {}) {
-    const queryString = new URLSearchParams(params).toString();
-    return this.request(`/chat/logs${queryString ? `?${queryString}` : ''}`);
-  }
-
   // Users
   async getUsers(params = {}) {
     const queryString = new URLSearchParams(params).toString();

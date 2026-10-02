@@ -1,6 +1,5 @@
 import { ReactNode } from "react";
 import Navigation from "./Navigation";
-import ChatBot from "./ChatBot";
 import BrandLogo from "./BrandLogo";
 import ProfileDropdown from "./ProfileDropdown";
 import { useAuth } from "@/contexts/AuthContext";
@@ -38,7 +37,6 @@ const DashboardLayout = ({ children, title }: { children: ReactNode; title: stri
       </div>
 
       <Navigation />
-      <ChatBot />
     </div>
   );
 };

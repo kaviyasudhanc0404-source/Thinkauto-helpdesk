@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import ProtectedRoute from "@/components/ProtectedRoute";
+import ChatBot from "@/components/ChatBot";
 import Index from "./pages/Index";
 import Login from "./pages/Login";
 import Signup from "./pages/Signup";
@@ -89,6 +90,8 @@ const App = () => (
 
             <Route path="*" element={<NotFound />} />
           </Routes>
+          {/* AI assistant — available on every page */}
+          <ChatBot />
         </BrowserRouter>
       </AuthProvider>
     </TooltipProvider>
